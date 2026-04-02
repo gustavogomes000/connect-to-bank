@@ -29,16 +29,16 @@ export function useKPIs() {
   return useQuery({
     queryKey: ['kpis', filters],
     queryFn: async () => {
-      // Count candidatos
-      let cq = supabase.from(TABELA_CANDIDATOS).select('id', { count: 'exact', head: true });
+      // Count candidatos via SELECT count
+      let cq = (supabase.from(TABELA_CANDIDATOS) as any).select('*', { count: 'exact', head: true });
       cq = applyFilters(cq, filters, 'candidatos');
 
       // Count elected
-      let eq2 = supabase.from(TABELA_CANDIDATOS).select('id', { count: 'exact', head: true }).ilike('situacao_final', '%ELEITO%').not('situacao_final', 'ilike', '%NÃO ELEITO%');
+      let eq2 = (supabase.from(TABELA_CANDIDATOS) as any).select('*', { count: 'exact', head: true }).ilike('situacao_final', '%ELEITO%').not('situacao_final', 'ilike', '%NÃO ELEITO%');
       eq2 = applyFilters(eq2, filters, 'candidatos');
 
       // Comparecimento (single page, aggregated)
-      let compQ = supabase.from(TABELA_COMPARECIMENTO).select('eleitorado_apto, comparecimento').limit(1000);
+      let compQ = (supabase.from(TABELA_COMPARECIMENTO) as any).select('eleitorado_apto, comparecimento').limit(1000);
       compQ = applyFilters(compQ, filters, 'comparecimento');
 
       // Run all in parallel
