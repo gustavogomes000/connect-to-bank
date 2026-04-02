@@ -109,7 +109,7 @@ export default function Dashboard() {
                 <XAxis dataKey="ano" />
                 <YAxis tickFormatter={(v: number) => formatNumber(v)} />
                 <Tooltip formatter={(v: number) => formatNumber(v)} />
-                <Bar dataKey="eleitorado" name="Eleitorado Apto" fill="hsl(221, 83%, 48%)" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="eleitorado" name="Eleitorado Apto" fill="hsl(338, 72%, 60%)" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="comparecimento" name="Comparecimento" fill="hsl(156, 72%, 34%)" radius={[4, 4, 0, 0]} />
                 <Legend />
               </BarChart>
