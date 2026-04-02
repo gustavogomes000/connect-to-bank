@@ -212,30 +212,33 @@ export function useCandidatoHistorico(nomeUrna: string, numeroUrna: number, part
   });
 }
 
-// Pull municipios from candidatos table (has data) + votacao_munzona as fallback
+// Pull municipios from candidatos (filtered by latest year for speed)
 export function useMunicipios() {
   return useQuery({
     queryKey: ['municipiosLista'],
     queryFn: async () => {
-      // Try candidatos first (always has data)
-      const { data: d1 } = await (supabase.from(TABELA_CANDIDATOS) as any).select('municipio').not('municipio', 'is', null).limit(1000);
-      const { data: d2 } = await (supabase.from(TABELA_VOTOS) as any).select('municipio').not('municipio', 'is', null).limit(1000);
-      const all = [...(d1 || []), ...(d2 || [])].map((r: any) => r.municipio).filter(Boolean);
-      const unique = [...new Set(all)].sort();
+      const { data } = await (supabase.from(TABELA_CANDIDATOS) as any)
+        .select('municipio')
+        .eq('ano', 2024)
+        .not('municipio', 'is', null)
+        .limit(1000);
+      const unique = [...new Set((data || []).map((r: any) => r.municipio).filter(Boolean))].sort();
       return unique as string[];
     },
   });
 }
 
-// Pull partidos from candidatos table + votacao
+// Pull partidos from candidatos
 export function usePartidos() {
   return useQuery({
     queryKey: ['partidosLista'],
     queryFn: async () => {
-      const { data: d1 } = await (supabase.from(TABELA_CANDIDATOS) as any).select('sigla_partido').not('sigla_partido', 'is', null).limit(1000);
-      const { data: d2 } = await (supabase.from(TABELA_VOTOS) as any).select('sigla_partido').not('sigla_partido', 'is', null).limit(1000);
-      const all = [...(d1 || []), ...(d2 || [])].map((r: any) => r.sigla_partido).filter(Boolean);
-      const unique = [...new Set(all)].sort();
+      const { data } = await (supabase.from(TABELA_CANDIDATOS) as any)
+        .select('sigla_partido')
+        .eq('ano', 2024)
+        .not('sigla_partido', 'is', null)
+        .limit(1000);
+      const unique = [...new Set((data || []).map((r: any) => r.sigla_partido).filter(Boolean))].sort();
       return unique as string[];
     },
   });
