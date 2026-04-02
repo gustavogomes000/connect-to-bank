@@ -61,9 +61,11 @@ export default function CandidatoPerfil() {
 
   const totalVotos = (votos || []).reduce((s: number, v: any) => s + (v.total_votos || 0), 0);
   const totalMunicipios = votosMun?.length || 0;
+  const totalPatrimonio = (bens || []).reduce((s: number, b: any) => s + (b.valor_bem || 0), 0);
   const votosMunPageSize = 10;
   const votosMunPaged = (votosMun || []).slice(votosPage * votosMunPageSize, (votosPage + 1) * votosMunPageSize);
   const totalVotosMunPages = Math.ceil((votosMun || []).length / votosMunPageSize);
+  const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
     <div className="space-y-6">
