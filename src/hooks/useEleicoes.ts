@@ -256,7 +256,7 @@ export function useCheckEmpty() {
     queryKey: ['checkEmpty'],
     queryFn: async () => {
       // Check candidatos (always imported first)
-      const { count } = await (supabase.from(TABELA_CANDIDATOS) as any).select('id', { count: 'exact', head: true });
+      const { count } = await (supabase.from(TABELA_CANDIDATOS) as any).select('*', { count: 'exact', head: true });
       return (count || 0) === 0;
     },
   });
