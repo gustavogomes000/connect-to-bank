@@ -86,7 +86,7 @@ export default function CandidatoPerfil() {
       </div>
 
       {/* Mini KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-card rounded-xl border p-4">
           <p className="text-sm text-muted-foreground">Total de Votos</p>
           <p className="text-2xl font-bold">{formatNumber(totalVotos)}</p>
