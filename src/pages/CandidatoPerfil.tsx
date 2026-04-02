@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { useCandidato, useCandidatoVotos } from '@/hooks/useEleicoes';
+import { useCandidato, useCandidatoVotos, usePatrimonioCandidato, useEvolucaoPatrimonio } from '@/hooks/useEleicoes';
 import { formatNumber, formatPercent } from '@/lib/eleicoes';
 import { CandidatoAvatar } from '@/components/eleicoes/CandidatoAvatar';
 import { SituacaoBadge } from '@/components/eleicoes/SituacaoBadge';
@@ -9,12 +9,14 @@ import { useQuery } from '@tanstack/react-query';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
 
 export default function CandidatoPerfil() {
   const { id } = useParams<{ id: string }>();
   const { data: candidato, isLoading } = useCandidato(id || '');
   const { data: votos, isLoading: loadingVotos } = useCandidatoVotos(candidato?.nome_urna || '', candidato?.ano || 0);
+  const { data: bens } = usePatrimonioCandidato(candidato?.sequencial_candidato || '');
+  const { data: evolucaoPatrimonio } = useEvolucaoPatrimonio(candidato?.nome_urna || '');
   const [votosPage, setVotosPage] = useState(0);
 
   // Historical
@@ -59,9 +61,11 @@ export default function CandidatoPerfil() {
 
   const totalVotos = (votos || []).reduce((s: number, v: any) => s + (v.total_votos || 0), 0);
   const totalMunicipios = votosMun?.length || 0;
+  const totalPatrimonio = (bens || []).reduce((s: number, b: any) => s + (b.valor_bem || 0), 0);
   const votosMunPageSize = 10;
   const votosMunPaged = (votosMun || []).slice(votosPage * votosMunPageSize, (votosPage + 1) * votosMunPageSize);
   const totalVotosMunPages = Math.ceil((votosMun || []).length / votosMunPageSize);
+  const formatBRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
   return (
     <div className="space-y-6">
@@ -82,7 +86,7 @@ export default function CandidatoPerfil() {
       </div>
 
       {/* Mini KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-card rounded-xl border p-4">
           <p className="text-sm text-muted-foreground">Total de Votos</p>
           <p className="text-2xl font-bold">{formatNumber(totalVotos)}</p>
@@ -98,6 +102,10 @@ export default function CandidatoPerfil() {
         <div className="bg-card rounded-xl border p-4">
           <p className="text-sm text-muted-foreground">Municípios c/ Votos</p>
           <p className="text-2xl font-bold">{totalMunicipios}</p>
+        </div>
+        <div className="bg-card rounded-xl border p-4">
+          <p className="text-sm text-muted-foreground flex items-center gap-1"><DollarSign className="w-3 h-3" /> Patrimônio</p>
+          <p className="text-2xl font-bold">{formatBRL(totalPatrimonio)}</p>
         </div>
       </div>
 
@@ -169,6 +177,52 @@ export default function CandidatoPerfil() {
           </div>
         )}
       </div>
+
+      {/* Patrimônio */}
+      {(bens || []).length > 0 && (
+        <div className="bg-card rounded-xl border p-5">
+          <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
+            <DollarSign className="w-4 h-4" /> Bens Declarados ({bens?.length} itens — {formatBRL(totalPatrimonio)})
+          </h3>
+          <div className="overflow-x-auto max-h-[300px]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="pb-2 font-medium">#</th>
+                  <th className="pb-2 font-medium">Tipo</th>
+                  <th className="pb-2 font-medium">Descrição</th>
+                  <th className="pb-2 font-medium text-right">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(bens || []).map((b: any, i: number) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="py-2 text-muted-foreground">{b.ordem_bem || i + 1}</td>
+                    <td className="py-2">{b.tipo_bem || '-'}</td>
+                    <td className="py-2 max-w-[300px] truncate">{b.descricao_bem || '-'}</td>
+                    <td className="py-2 text-right font-medium">{formatBRL(b.valor_bem || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Evolução patrimonial */}
+      {(evolucaoPatrimonio || []).length > 1 && (
+        <div className="bg-card rounded-xl border p-5">
+          <h3 className="text-base font-semibold mb-4">Evolução Patrimonial</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={evolucaoPatrimonio || []}>
+              <XAxis dataKey="ano" />
+              <YAxis tickFormatter={(v: number) => formatBRL(v)} />
+              <Tooltip formatter={(v: number) => formatBRL(v)} />
+              <Line type="monotone" dataKey="patrimonio" name="Patrimônio" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }
