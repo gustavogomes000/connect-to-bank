@@ -54,8 +54,8 @@ export function useKPIs() {
       });
       const pctComparecimento = totalApto > 0 ? (totalComp / totalApto) * 100 : 0;
 
-      // Total votos: use votacao_partido (much fewer rows than munzona)
-      let vq = supabase.from('bd_eleicoes_votacao_partido' as any).select('total_votos').limit(1000);
+      // Total votos: use votacao_munzona with limit
+      let vq = supabase.from(TABELA_VOTOS).select('total_votos').limit(1000);
       if (filters.ano) vq = vq.eq('ano', filters.ano);
       if (filters.turno) vq = vq.eq('turno', filters.turno);
       if (filters.cargo) vq = (vq as any).ilike('cargo', filters.cargo);
