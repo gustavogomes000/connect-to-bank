@@ -177,6 +177,52 @@ export default function CandidatoPerfil() {
           </div>
         )}
       </div>
+
+      {/* Patrimônio */}
+      {(bens || []).length > 0 && (
+        <div className="bg-card rounded-xl border p-5">
+          <h3 className="text-base font-semibold mb-4 flex items-center gap-2">
+            <DollarSign className="w-4 h-4" /> Bens Declarados ({bens?.length} itens — {formatBRL(totalPatrimonio)})
+          </h3>
+          <div className="overflow-x-auto max-h-[300px]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="pb-2 font-medium">#</th>
+                  <th className="pb-2 font-medium">Tipo</th>
+                  <th className="pb-2 font-medium">Descrição</th>
+                  <th className="pb-2 font-medium text-right">Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(bens || []).map((b: any, i: number) => (
+                  <tr key={i} className="border-b last:border-0">
+                    <td className="py-2 text-muted-foreground">{b.ordem_bem || i + 1}</td>
+                    <td className="py-2">{b.tipo_bem || '-'}</td>
+                    <td className="py-2 max-w-[300px] truncate">{b.descricao_bem || '-'}</td>
+                    <td className="py-2 text-right font-medium">{formatBRL(b.valor_bem || 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Evolução patrimonial */}
+      {(evolucaoPatrimonio || []).length > 1 && (
+        <div className="bg-card rounded-xl border p-5">
+          <h3 className="text-base font-semibold mb-4">Evolução Patrimonial</h3>
+          <ResponsiveContainer width="100%" height={250}>
+            <LineChart data={evolucaoPatrimonio || []}>
+              <XAxis dataKey="ano" />
+              <YAxis tickFormatter={(v: number) => formatBRL(v)} />
+              <Tooltip formatter={(v: number) => formatBRL(v)} />
+              <Line type="monotone" dataKey="patrimonio" name="Patrimônio" stroke="hsl(var(--primary))" strokeWidth={2} dot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }
