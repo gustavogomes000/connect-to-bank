@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { BarChart3, Trophy, Users, Building2, Target, Download, HelpCircle, Vote } from 'lucide-react';
+import { BarChart3, Trophy, Users, Building2, Target, Download, HelpCircle, Vote, MapPin, DollarSign, UserCheck } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
