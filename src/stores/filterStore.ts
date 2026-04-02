@@ -15,7 +15,7 @@ interface FilterState {
 }
 
 export const useFilterStore = create<FilterState>((set) => ({
-  ano: null,
+  ano: 2024,
   turno: null,
   cargo: null,
   municipio: null,

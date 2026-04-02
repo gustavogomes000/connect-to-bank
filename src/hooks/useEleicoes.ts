@@ -29,46 +29,42 @@ export function useKPIs() {
   return useQuery({
     queryKey: ['kpis', filters],
     queryFn: async () => {
-      let cq = supabase.from(TABELA_CANDIDATOS).select('id', { count: 'exact', head: true });
+      // Count candidatos - fetch minimal data
+      let cq = (supabase.from(TABELA_CANDIDATOS) as any).select('id, situacao_final').limit(1000);
       cq = applyFilters(cq, filters, 'candidatos');
-      const { count: totalCandidatos } = await cq;
-
-      // Total votes
-      let totalVotos = 0;
-      let page = 0;
-      const pageSize = 1000;
-      while (true) {
-        let q = supabase.from(TABELA_VOTOS).select('total_votos').range(page * pageSize, (page + 1) * pageSize - 1);
-        q = applyFilters(q, filters, 'votacao');
-        const { data } = await q;
-        if (!data || data.length === 0) break;
-        totalVotos += data.reduce((sum: number, r: any) => sum + (r.total_votos || 0), 0);
-        if (data.length < pageSize) break;
-        page++;
-      }
-
-      // Count elected
-      let eq2 = supabase.from(TABELA_CANDIDATOS).select('id', { count: 'exact', head: true }).ilike('situacao_final', '%ELEITO%').not('situacao_final', 'ilike', '%NÃO ELEITO%');
-      eq2 = applyFilters(eq2, filters, 'candidatos');
-      const { count: totalEleitos } = await eq2;
 
       // Comparecimento
-      let totalApto = 0;
-      let totalComp = 0;
-      let compPage = 0;
-      while (true) {
-        let compQ = supabase.from(TABELA_COMPARECIMENTO).select('eleitorado_apto, comparecimento').range(compPage * pageSize, (compPage + 1) * pageSize - 1);
-        compQ = applyFilters(compQ, filters, 'comparecimento');
-        const { data: compData } = await compQ;
-        if (!compData || compData.length === 0) break;
-        totalApto += compData.reduce((s: number, r: any) => s + (r.eleitorado_apto || 0), 0);
-        totalComp += compData.reduce((s: number, r: any) => s + (r.comparecimento || 0), 0);
-        if (compData.length < pageSize) break;
-        compPage++;
-      }
+      let compQ = (supabase.from(TABELA_COMPARECIMENTO) as any).select('eleitorado_apto, comparecimento').limit(1000);
+      compQ = applyFilters(compQ, filters, 'comparecimento');
+
+      // Run in parallel
+      const [candRes, compRes] = await Promise.all([cq, compQ]);
+
+      const candData = candRes.data || [];
+      const totalCandidatos = candData.length;
+      const totalEleitos = candData.filter((c: any) => {
+        const s = (c.situacao_final || '').toUpperCase();
+        return s.includes('ELEITO') && !s.includes('NÃO ELEITO');
+      }).length;
+
+      let totalApto = 0, totalComp = 0;
+      (compRes.data || []).forEach((r: any) => {
+        totalApto += r.eleitorado_apto || 0;
+        totalComp += r.comparecimento || 0;
+      });
       const pctComparecimento = totalApto > 0 ? (totalComp / totalApto) * 100 : 0;
 
-      return { totalCandidatos: totalCandidatos || 0, totalVotos, totalEleitos: totalEleitos || 0, pctComparecimento };
+      // Total votos: use votacao_munzona with limit
+      let vq = supabase.from(TABELA_VOTOS).select('total_votos').limit(1000);
+      if (filters.ano) vq = vq.eq('ano', filters.ano);
+      if (filters.turno) vq = vq.eq('turno', filters.turno);
+      if (filters.cargo) vq = (vq as any).ilike('cargo', filters.cargo);
+      if (filters.municipio) vq = vq.eq('municipio', filters.municipio);
+      if (filters.partido) vq = vq.eq('sigla_partido', filters.partido);
+      const { data: votosData } = await vq;
+      const totalVotos = (votosData || []).reduce((sum: number, r: any) => sum + (r.total_votos || 0), 0);
+
+      return { totalCandidatos, totalVotos, totalEleitos, pctComparecimento };
     },
   });
 }
@@ -216,30 +212,33 @@ export function useCandidatoHistorico(nomeUrna: string, numeroUrna: number, part
   });
 }
 
-// Pull municipios from candidatos table (has data) + votacao_munzona as fallback
+// Pull municipios from candidatos (filtered by latest year for speed)
 export function useMunicipios() {
   return useQuery({
     queryKey: ['municipiosLista'],
     queryFn: async () => {
-      // Try candidatos first (always has data)
-      const { data: d1 } = await (supabase.from(TABELA_CANDIDATOS) as any).select('municipio').not('municipio', 'is', null).limit(1000);
-      const { data: d2 } = await (supabase.from(TABELA_VOTOS) as any).select('municipio').not('municipio', 'is', null).limit(1000);
-      const all = [...(d1 || []), ...(d2 || [])].map((r: any) => r.municipio).filter(Boolean);
-      const unique = [...new Set(all)].sort();
+      const { data } = await (supabase.from(TABELA_CANDIDATOS) as any)
+        .select('municipio')
+        .eq('ano', 2024)
+        .not('municipio', 'is', null)
+        .limit(1000);
+      const unique = [...new Set((data || []).map((r: any) => r.municipio).filter(Boolean))].sort();
       return unique as string[];
     },
   });
 }
 
-// Pull partidos from candidatos table + votacao
+// Pull partidos from candidatos
 export function usePartidos() {
   return useQuery({
     queryKey: ['partidosLista'],
     queryFn: async () => {
-      const { data: d1 } = await (supabase.from(TABELA_CANDIDATOS) as any).select('sigla_partido').not('sigla_partido', 'is', null).limit(1000);
-      const { data: d2 } = await (supabase.from(TABELA_VOTOS) as any).select('sigla_partido').not('sigla_partido', 'is', null).limit(1000);
-      const all = [...(d1 || []), ...(d2 || [])].map((r: any) => r.sigla_partido).filter(Boolean);
-      const unique = [...new Set(all)].sort();
+      const { data } = await (supabase.from(TABELA_CANDIDATOS) as any)
+        .select('sigla_partido')
+        .eq('ano', 2024)
+        .not('sigla_partido', 'is', null)
+        .limit(1000);
+      const unique = [...new Set((data || []).map((r: any) => r.sigla_partido).filter(Boolean))].sort();
       return unique as string[];
     },
   });
@@ -260,7 +259,7 @@ export function useCheckEmpty() {
     queryKey: ['checkEmpty'],
     queryFn: async () => {
       // Check candidatos (always imported first)
-      const { count } = await (supabase.from(TABELA_CANDIDATOS) as any).select('id', { count: 'exact', head: true });
+      const { count } = await (supabase.from(TABELA_CANDIDATOS) as any).select('*', { count: 'exact', head: true });
       return (count || 0) === 0;
     },
   });
