@@ -111,10 +111,8 @@ def filtrar_records_municipio(records: List[Dict], item: dict) -> List[Dict]:
 
 def filtrar_csv_municipio(headers: List[str], rows: List[list], item: dict):
     """Filtra CSV rows para conter apenas Goiânia e Aparecida"""
-    fonte = item.get("fonte", "")
-    
-    if fonte.startswith("transparencia_"):
-        return headers, rows  # Já específico
+    if item.get("skip_filtro_municipal", False):
+        return headers, rows
     
     # Procurar coluna de município
     mun_cols = ["co_municipio", "codigo_municipio", "cd_municipio", "codmun", "cod_municipio"]
