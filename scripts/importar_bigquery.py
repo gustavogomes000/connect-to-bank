@@ -37,8 +37,18 @@ DATASET    = "eleicoes_go_clean"
 FULL_DS    = f"{PROJECT}.{DATASET}"
 LOCATION   = "US"
 UF_FILTRO  = "GO"
-VERSION    = "tse-go-bq-v4.0"
+VERSION    = "tse-go-bq-v5.0"
 CONFIG     = "sources.json"
+
+# Filtro municipal: SOMENTE Goiânia e Aparecida de Goiânia
+# Códigos TSE (5 dígitos) e IBGE (7 dígitos)
+MUNICIPIOS_FOCO = {
+    # Goiânia
+    "52749", "5208707", "GOIANIA", "GOIÂNIA",
+    # Aparecida de Goiânia
+    "50415", "5201405", "APARECIDA DE GOIANIA", "APARECIDA DE GOIÂNIA",
+}
+FILTRO_MUNICIPAL = True  # True = só Aparecida+Goiânia, False = GO inteiro
 
 CACHE_DIR  = Path(".cache_tse")
 STATE_DIR  = Path(".state")
