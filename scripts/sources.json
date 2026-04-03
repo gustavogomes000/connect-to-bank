@@ -112,6 +112,19 @@
 
     {"fonte": "tse", "tipo": "prestacao_partidos",   "ano": 2024, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/prestacao_contas/prestacao_de_contas_eleitorais_orgaos_partidarios_2024.zip", "tabela_bq": "raw_prestacao_partidos_2024", "prioridade": 2},
 
-    {"fonte": "tse", "tipo": "fundo_partidario",     "ano": 2024, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/prestacao_contas/fundo_partidario_fe_2024.zip", "tabela_bq": "raw_fundo_partidario_2024", "prioridade": 2}
+    {"fonte": "tse", "tipo": "fundo_partidario",     "ano": 2024, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/prestacao_contas/fundo_partidario_fe_2024.zip", "tabela_bq": "raw_fundo_partidario_2024", "prioridade": 2},
+
+    {"fonte": "tse", "tipo": "doadores_campanha",    "ano": 2024, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/prestacao_contas/receitas_candidatos_doadores_2024.zip", "tabela_bq": "raw_doadores_campanha_2024", "prioridade": 2},
+    {"fonte": "tse", "tipo": "doadores_campanha",    "ano": 2022, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/prestacao_contas/receitas_candidatos_doadores_2022.zip", "tabela_bq": "raw_doadores_campanha_2022", "prioridade": 2},
+    {"fonte": "tse", "tipo": "doadores_campanha",    "ano": 2020, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/prestacao_contas/receitas_candidatos_doadores_2020.zip", "tabela_bq": "raw_doadores_campanha_2020", "prioridade": 2},
+
+    {"fonte": "tse", "tipo": "mesarios",             "ano": 2024, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_mesarios/consulta_mesarios_2024.zip", "tabela_bq": "raw_mesarios_2024", "prioridade": 2},
+    {"fonte": "tse", "tipo": "mesarios",             "ano": 2022, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_mesarios/consulta_mesarios_2022.zip", "tabela_bq": "raw_mesarios_2022", "prioridade": 2},
+    {"fonte": "tse", "tipo": "mesarios",             "ano": 2020, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/consulta_mesarios/consulta_mesarios_2020.zip", "tabela_bq": "raw_mesarios_2020", "prioridade": 2},
+
+    {"fonte": "tse", "tipo": "transferencia_eleitoral","ano": 2024, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/transferencia_eleitoral/transferencia_eleitoral_2024.zip", "tabela_bq": "raw_transferencia_eleitoral_2024", "prioridade": 2},
+    {"fonte": "tse", "tipo": "transferencia_eleitoral","ano": 2022, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/transferencia_eleitoral/transferencia_eleitoral_2022.zip", "tabela_bq": "raw_transferencia_eleitoral_2022", "prioridade": 2},
+
+    {"fonte": "tse", "tipo": "perfil_raca_cor",      "ano": 2024, "formato": "zip_csv", "url": "https://cdn.tse.jus.br/estatistica/sead/odsele/perfil_eleitorado/perfil_eleitorado_2024.zip", "tabela_bq": "raw_perfil_raca_cor_2024", "prioridade": 2, "nota": "Raça/cor está dentro do perfil_eleitorado - mesmo ZIP, colunas diferentes"}
   ]
 }
