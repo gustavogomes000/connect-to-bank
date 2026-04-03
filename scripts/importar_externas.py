@@ -648,21 +648,23 @@ def process_item(sess, item):
         records = filtrar_records_municipio(records, item)
         return "records", records
 
+    elif fmt == "api_json_paginado_offset":
+        records = process_api_json_paginado_offset(sess, url, item)
+        records = filtrar_records_municipio(records, item)
+        return "records", records
+
     elif fmt == "download_csv":
         headers, rows = process_download_csv(sess, url, item)
-        # >>> FILTRO MUNICIPAL para CSV <<<
         headers, rows = filtrar_csv_municipio(headers, rows, item)
         return "csv", (headers, rows)
 
     elif fmt == "download_zip":
         headers, rows = process_download_zip(sess, url, item)
-        # >>> FILTRO MUNICIPAL para CSV do ZIP <<<
         headers, rows = filtrar_csv_municipio(headers, rows, item)
         return "csv", (headers, rows)
 
     elif fmt == "download_geojson":
         records = process_geojson(sess, url, item)
-        # GeoJSON de malha já é específico por município (URL tem código IBGE)
         return "records", records
 
     else:
