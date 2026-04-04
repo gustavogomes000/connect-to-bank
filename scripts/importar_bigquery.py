@@ -577,7 +577,9 @@ def cmd_importar(args):
 
         if not zip_path.exists():
             log_dl(src.url[:120])
-            if not download(sess, src.url, zip_path):
+            if src.timeout > 600:
+                log_info(f"Timeout estendido: {src.timeout}s (arquivo nacional grande)")
+            if not download(sess, src.url, zip_path, timeout=src.timeout):
                 log_error_detail(src.tipo, ano, zip_name, "Download falhou após 3 tentativas")
                 n_err += 1
                 results.append({"tabela": src.tabela, "status": "erro", "linhas": 0, "erro": "download"})
