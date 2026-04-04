@@ -182,7 +182,8 @@ class Src:
     url: str
     tabela: str
     prioridade: int = 1
-    csv_filter: Optional[str] = None  # Filtrar CSVs dentro do ZIP por nome
+    csv_filter: Optional[str] = None
+    timeout: int = 600  # Timeout de download em segundos
 
 def load_sources():
     data = json.loads(Path(CONFIG).read_text("utf-8"))
@@ -194,17 +195,18 @@ def load_sources():
         if not (url and tipo and tab): continue
         out.append(Src(tipo=tipo, ano=safe_int(it.get("ano")), url=url, tabela=tab,
                        prioridade=safe_int(it.get("prioridade")) or 1,
-                       csv_filter=it.get("csv_filter")))
+                       csv_filter=it.get("csv_filter"),
+                       timeout=safe_int(it.get("timeout")) or 600))
     return out
 
 # ═══════════════════════════════════════════════════════════
 #  DOWNLOAD com retry + backoff
 # ═══════════════════════════════════════════════════════════
-def download(sess, url, dest, retries=3):
+def download(sess, url, dest, retries=3, timeout=600):
     dest.parent.mkdir(parents=True, exist_ok=True)
     for attempt in range(1, retries+1):
         try:
-            with sess.get(url, stream=True, timeout=600) as r:
+            with sess.get(url, stream=True, timeout=timeout) as r:
                 r.raise_for_status()
                 total = int(r.headers.get("content-length") or 0)
                 with dest.open("wb") as f:
@@ -575,7 +577,9 @@ def cmd_importar(args):
 
         if not zip_path.exists():
             log_dl(src.url[:120])
-            if not download(sess, src.url, zip_path):
+            if src.timeout > 600:
+                log_info(f"Timeout estendido: {src.timeout}s (arquivo nacional grande)")
+            if not download(sess, src.url, zip_path, timeout=src.timeout):
                 log_error_detail(src.tipo, ano, zip_name, "Download falhou após 3 tentativas")
                 n_err += 1
                 results.append({"tabela": src.tabela, "status": "erro", "linhas": 0, "erro": "download"})
