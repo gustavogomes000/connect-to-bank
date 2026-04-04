@@ -675,22 +675,21 @@ def cmd_importar(args):
             results.append({"tabela": src.tabela, "status": "skip", "linhas": 0})
             continue
 
-        # Download — usa cache pelo nome do arquivo
-        zip_name = Path(src.url.split("?")[0]).name
-        zip_path = CACHE_DIR / zip_name
+        source_name = Path(src.url.split("?")[0]).name
+        zip_name = source_name
+        zip_path, resolved_name, resolved_url, download_errors = download_with_fallback(sess, src)
+        if resolved_name:
+            zip_name = resolved_name
 
-        if not zip_path.exists():
-            log_dl(src.url[:120])
-            if src.timeout > 600:
-                log_info(f"Timeout estendido: {src.timeout}s (arquivo nacional grande)")
-            if not download(sess, src.url, zip_path, timeout=src.timeout):
-                log_error_detail(src.tipo, ano, zip_name, "Download falhou após 3 tentativas")
-                n_err += 1
-                results.append({"tabela": src.tabela, "status": "erro", "linhas": 0, "erro": "download"})
-                continue
-            log_dl(f"✓ {fmt_bytes(zip_path.stat().st_size)}")
-        else:
-            log_skip(f"Cache: {zip_name} ({fmt_bytes(zip_path.stat().st_size)})")
+        if not zip_path:
+            detail = "; ".join(download_errors) if download_errors else "sem detalhe"
+            log_error_detail(src.tipo, ano, source_name, f"Download falhou | {detail}")
+            n_err += 1
+            results.append({"tabela": src.tabela, "status": "erro", "linhas": 0, "erro": "download"})
+            continue
+
+        if resolved_url and resolved_url != src.url:
+            log_info(f"URL efetiva: {resolved_url}")
 
         # Processar ZIP
         t0 = time.time()
