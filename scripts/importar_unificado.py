@@ -484,10 +484,11 @@ def load_csv_to_bq(client, table_name: str, csv_path: Path,
         field_delimiter=",",
         quote_character='"',
         allow_quoted_newlines=True,
+        allow_jagged_rows=True,
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
         autodetect=False,
         schema=schema,
-        max_bad_records=50,
+        max_bad_records=500,
     )
 
     if partition_col and partition_col in headers:
