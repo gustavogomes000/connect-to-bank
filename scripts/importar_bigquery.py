@@ -44,7 +44,8 @@ FULL_DS    = f"{PROJECT}.{DATASET}"
 LOCATION   = "US"
 UF_FILTRO  = "GO"
 VERSION    = "tse-go-bq-v5.1"
-CONFIG     = "sources.json"
+BASE_DIR   = Path(__file__).resolve().parent
+CONFIG     = BASE_DIR / "sources.json"
 
 # Filtro municipal: SOMENTE Goiânia e Aparecida de Goiânia
 MUNICIPIOS_FOCO = {
@@ -53,9 +54,9 @@ MUNICIPIOS_FOCO = {
 }
 FILTRO_MUNICIPAL = True
 
-CACHE_DIR  = Path(".cache_tse")
-STATE_DIR  = Path(".state")
-LOG_DIR    = Path(".logs")
+CACHE_DIR  = BASE_DIR / ".cache_tse"
+STATE_DIR  = BASE_DIR / ".state"
+LOG_DIR    = BASE_DIR / ".logs"
 
 # ═══════════════════════════════════════════════════════════
 #  CONSOLE
