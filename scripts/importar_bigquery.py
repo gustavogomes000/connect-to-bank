@@ -236,7 +236,7 @@ def build_download_candidates(src):
         )
 
     if src.tipo == "comparecimento_secao":
-        candidates.append(re.sub(r"_GO(?=\\.zip(?:\\?|$))", "", url, flags=re.I))
+        candidates.append(re.sub(r"_GO(?=\.zip(?:\?|$))", "", url, flags=re.I))
 
     candidates.append(url)
     return dedupe_list(candidates)
