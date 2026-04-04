@@ -202,11 +202,11 @@ def load_sources():
 # ═══════════════════════════════════════════════════════════
 #  DOWNLOAD com retry + backoff
 # ═══════════════════════════════════════════════════════════
-def download(sess, url, dest, retries=3):
+def download(sess, url, dest, retries=3, timeout=600):
     dest.parent.mkdir(parents=True, exist_ok=True)
     for attempt in range(1, retries+1):
         try:
-            with sess.get(url, stream=True, timeout=600) as r:
+            with sess.get(url, stream=True, timeout=timeout) as r:
                 r.raise_for_status()
                 total = int(r.headers.get("content-length") or 0)
                 with dest.open("wb") as f:
