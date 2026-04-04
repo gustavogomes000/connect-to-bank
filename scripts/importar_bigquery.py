@@ -543,7 +543,7 @@ def cmd_importar(args):
     ok_keys = load_ok_keys() if args.resume and not args.force else set()
     run_id = utcnow().strftime("%Y%m%d_%H%M%S")
     sess = requests.Session()
-    sess.headers.update({"User-Agent": "EleicoesGO-Importador/5.0"})
+    sess.headers.update({"User-Agent": "EleicoesGO-Importador/5.1"})
 
     log_info(f"{len(sources)} fontes | Prioridade ≤ {args.prioridade}")
     log_info(f"Dataset: {FULL_DS} | Resume: {'SIM' if args.resume else 'NÃO'}")
