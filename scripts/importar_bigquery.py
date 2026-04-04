@@ -43,7 +43,7 @@ DATASET    = "eleicoes_go_clean"
 FULL_DS    = f"{PROJECT}.{DATASET}"
 LOCATION   = "US"
 UF_FILTRO  = "GO"
-VERSION    = "tse-go-bq-v5.0"
+VERSION    = "tse-go-bq-v5.1"
 CONFIG     = "sources.json"
 
 # Filtro municipal: SOMENTE Goiânia e Aparecida de Goiânia
