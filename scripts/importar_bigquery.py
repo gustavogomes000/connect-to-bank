@@ -185,6 +185,16 @@ class Src:
     csv_filter: Optional[str] = None
     timeout: int = 600  # Timeout de download em segundos
 
+def normalize_csv_filter(tipo, url, csv_filter):
+    csv_filter = str(csv_filter or "").strip()
+    if csv_filter:
+        return csv_filter
+    if tipo == "despesas":
+        return "despesa"
+    if tipo == "receitas" and "prestacao_de_contas" in url:
+        return "receita"
+    return None
+
 def load_sources():
     data = json.loads(Path(CONFIG).read_text("utf-8"))
     out = []
@@ -192,21 +202,71 @@ def load_sources():
         url = str(it.get("url","")).strip()
         tipo = str(it.get("tipo","")).strip()
         tab = str(it.get("tabela_bq","")).strip()
-        if not (url and tipo and tab): continue
-        out.append(Src(tipo=tipo, ano=safe_int(it.get("ano")), url=url, tabela=tab,
-                       prioridade=safe_int(it.get("prioridade")) or 1,
-                       csv_filter=it.get("csv_filter"),
-                       timeout=safe_int(it.get("timeout")) or 600))
+        if not (url and tipo and tab):
+            continue
+        out.append(Src(
+            tipo=tipo,
+            ano=safe_int(it.get("ano")),
+            url=url,
+            tabela=tab,
+            prioridade=safe_int(it.get("prioridade")) or 1,
+            csv_filter=normalize_csv_filter(tipo, url, it.get("csv_filter")),
+            timeout=safe_int(it.get("timeout")) or 600,
+        ))
     return out
 
+def dedupe_list(items):
+    out = []
+    seen = set()
+    for item in items:
+        if not item or item in seen:
+            continue
+        seen.add(item)
+        out.append(item)
+    return out
+
+def build_download_candidates(src):
+    candidates = []
+    url = str(src.url or "").strip()
+
+    if src.tipo == "despesas" and src.ano:
+        candidates.append(
+            f"https://cdn.tse.jus.br/estatistica/sead/odsele/prestacao_contas/"
+            f"prestacao_de_contas_eleitorais_candidatos_{src.ano}.zip"
+        )
+
+    if src.tipo == "comparecimento_secao":
+        candidates.append(re.sub(r"_GO(?=\\.zip(?:\\?|$))", "", url, flags=re.I))
+
+    candidates.append(url)
+    return dedupe_list(candidates)
+
+def ensure_valid_cached_zip(path):
+    if not path.exists():
+        return False
+    try:
+        if path.stat().st_size < 1024:
+            log_info(f"Cache inválido (arquivo muito pequeno) — removendo {path.name}")
+            path.unlink(missing_ok=True)
+            return False
+        if not zipfile.is_zipfile(path):
+            log_info(f"Cache inválido (não é ZIP) — removendo {path.name}")
+            path.unlink(missing_ok=True)
+            return False
+        return True
+    except Exception:
+        path.unlink(missing_ok=True)
+        return False
+
 # ═══════════════════════════════════════════════════════════
-#  DOWNLOAD com retry + backoff
+#  DOWNLOAD com retry + backoff + fallback
 # ═══════════════════════════════════════════════════════════
 def download(sess, url, dest, retries=3, timeout=600):
     dest.parent.mkdir(parents=True, exist_ok=True)
+    last_err = None
     for attempt in range(1, retries+1):
         try:
-            with sess.get(url, stream=True, timeout=timeout) as r:
+            with sess.get(url, stream=True, timeout=timeout, allow_redirects=True) as r:
                 r.raise_for_status()
                 total = int(r.headers.get("content-length") or 0)
                 with dest.open("wb") as f:
@@ -220,13 +280,19 @@ def download(sess, url, dest, retries=3, timeout=600):
                                 print(f"\r  ↓ {dest.name}: {fmt_bytes(downloaded)}/{fmt_bytes(total)} ({pct}%)", end="", flush=True)
                 if total:
                     print()
-            # Validar tamanho mínimo
-            if dest.stat().st_size < 100:
-                log_err(f"Arquivo muito pequeno: {dest.stat().st_size} bytes")
+            if dest.stat().st_size < 1024:
+                last_err = f"Arquivo muito pequeno: {dest.stat().st_size} bytes"
+                log_err(last_err)
                 dest.unlink(missing_ok=True)
                 continue
-            return True
+            if not zipfile.is_zipfile(dest):
+                last_err = "Arquivo baixado não é um ZIP válido"
+                log_err(last_err)
+                dest.unlink(missing_ok=True)
+                continue
+            return True, None
         except Exception as e:
+            last_err = f"{type(e).__name__}: {e}"
             if attempt < retries:
                 wait = attempt * 10
                 log_info(f"Retry {attempt}/{retries} em {wait}s: {e}")
@@ -234,8 +300,46 @@ def download(sess, url, dest, retries=3, timeout=600):
             else:
                 log_err(f"Download falhou após {retries} tentativas: {e}")
                 dest.unlink(missing_ok=True)
-                return False
-    return False
+                return False, last_err
+    return False, last_err
+
+def download_with_fallback(sess, src):
+    errors = []
+    candidates = build_download_candidates(src)
+    timeout_logged = False
+
+    if len(candidates) > 1:
+        log_info(f"Fallback automático: {len(candidates)} URL(s) candidatas")
+
+    for pos, candidate in enumerate(candidates, 1):
+        zip_name = Path(candidate.split("?")[0]).name
+        zip_path = CACHE_DIR / zip_name
+
+        if ensure_valid_cached_zip(zip_path):
+            size = fmt_bytes(zip_path.stat().st_size)
+            if candidate != src.url:
+                log_info(f"Fallback aplicado em cache → {zip_name} ({size})")
+            else:
+                log_skip(f"Cache: {zip_name} ({size})")
+            return zip_path, zip_name, candidate, errors
+
+        if len(candidates) > 1:
+            log_info(f"Tentando URL {pos}/{len(candidates)}: {zip_name}")
+        log_dl(candidate[:120])
+        if src.timeout > 600 and not timeout_logged:
+            log_info(f"Timeout estendido: {src.timeout}s (arquivo nacional grande)")
+            timeout_logged = True
+
+        ok, err = download(sess, candidate, zip_path, timeout=src.timeout)
+        if ok:
+            log_dl(f"✓ {fmt_bytes(zip_path.stat().st_size)}")
+            if candidate != src.url:
+                log_info(f"Download resolvido via fallback → {zip_name}")
+            return zip_path, zip_name, candidate, errors
+
+        errors.append(f"{zip_name}: {err or 'falhou'}")
+
+    return None, None, None, errors
 
 # ═══════════════════════════════════════════════════════════
 #  CSV PARSING
