@@ -268,11 +268,11 @@ def decode(b):
 # ═══════════════════════════════════════════════════════════
 #  FILTRO MUNICIPAL — Aparecida + Goiânia
 # ═══════════════════════════════════════════════════════════
-UF_COLS  = ["sg_uf","sigla_uf","uf","cd_uf","cod_uf"]
+UF_COLS  = ["sg_uf","sigla_uf","uf","cd_uf","cod_uf","sg_uf_voto","sg_uf_cnpj"]
 UF_BAD   = ["nasc","natural","origem","nascimento"]
 MUN_COLS = ["cd_municipio","cod_municipio","codigo_municipio","id_municipio","codmun","cdmun",
-            "sg_ue","cd_municipio_nascimento"]
-MUN_NAME_COLS = ["nm_municipio","nm_ue","nome_municipio","municipio","ds_municipio"]
+            "sg_ue","cd_municipio_nascimento","cd_mun"]
+MUN_NAME_COLS = ["nm_municipio","nm_ue","nome_municipio","municipio","ds_municipio","nm_mun"]
 
 def find_uf_col(headers):
     for name in UF_COLS:
@@ -621,8 +621,16 @@ def cmd_importar(args):
                     if not headers:
                         continue
 
+                    # Debug: mostrar headers e colunas de filtro encontradas
                     if all_headers is None:
                         all_headers = headers
+                        uf_i = find_uf_col(headers)
+                        mun_i = find_mun_col(headers)
+                        mun_n = find_mun_name_col(headers)
+                        log_info(f"  Headers ({len(headers)} cols): {headers[:10]}...")
+                        log_info(f"  UF col: {headers[uf_i] if uf_i is not None else 'NENHUMA'} | "
+                                 f"Mun col: {headers[mun_i] if mun_i is not None else 'NENHUMA'} | "
+                                 f"MunName: {headers[mun_n] if mun_n is not None else 'NENHUMA'}")
                     elif headers != all_headers:
                         log_info(f"  {fname}: headers diferente, pulando")
                         continue
@@ -630,6 +638,8 @@ def cmd_importar(args):
                     if n_go > 0:
                         log_flt(f"  {fname}: {n_go:,} linhas GO" + (f" (de {n_total:,})" if n_total != n_go else ""))
                         all_rows.extend(rows)
+                    else:
+                        log_info(f"  {fname}: 0 linhas GO de {n_total:,} total")
 
                 if not all_rows or all_headers is None:
                     log_err(f"0 linhas GO encontradas em {zip_name}")
