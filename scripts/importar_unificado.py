@@ -901,7 +901,7 @@ def process_download_csv(sess, item):
 
     # Escreve CSV filtrado em temp
     tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False, encoding="utf-8", newline="")
-    writer = csv.writer(tmp, delimiter=",", quoting=csv.QUOTE_MINIMAL)
+    writer = csv.writer(tmp, delimiter=",", quoting=csv.QUOTE_ALL)
     writer.writerow(headers)
     n = 0
     for row in reader:
