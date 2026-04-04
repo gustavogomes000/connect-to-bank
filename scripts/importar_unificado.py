@@ -487,6 +487,7 @@ def load_csv_to_bq(client, table_name: str, csv_path: Path,
         write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
         autodetect=False,
         schema=schema,
+        max_bad_records=50,
     )
 
     if partition_col and partition_col in headers:
@@ -568,8 +569,8 @@ def process_zip_csv(sess, item):
 
         # Cria CSV temporário para streaming
         tmp = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False,
-                                          encoding="utf-8", newline="")
-        writer = csv.writer(tmp, delimiter=",", quoting=csv.QUOTE_MINIMAL)
+                                           encoding="utf-8", newline="")
+        writer = csv.writer(tmp, delimiter=",", quoting=csv.QUOTE_ALL)
         final_headers = None
         n_rows = 0
         n_total = 0
@@ -592,7 +593,9 @@ def process_zip_csv(sess, item):
                              f"Mun: {headers[mun_i] if mun_i is not None else '-'} | "
                              f"MunNm: {headers[mun_n] if mun_n is not None else '-'}")
 
-                writer.writerow(row)
+                # Sanitiza: remove newlines internos e caracteres nulos
+                sanitized = [v.replace("\n"," ").replace("\r"," ").replace("\x00","") if isinstance(v, str) else v for v in row]
+                writer.writerow(sanitized)
                 n_rows += 1
                 member_rows += 1
 
