@@ -44,7 +44,7 @@ DATASET    = "eleicoes_go_clean"
 FULL_DS    = f"{PROJECT}.{DATASET}"
 LOCATION   = "US"
 UF_FILTRO  = "GO"
-VERSION    = "unificado-v8.0"
+VERSION    = "unificado-v9.0"
 
 BASE_DIR   = Path(__file__).resolve().parent
 CWD_DIR    = Path.cwd().resolve()
