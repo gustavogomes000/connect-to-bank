@@ -1351,6 +1351,8 @@ def main():
         print(f"    python importar_unificado.py importar --prioridade 1")
         print(f"    python importar_unificado.py importar --resume")
         print(f"    python importar_unificado.py importar --fonte ibge")
+        print(f"    python importar_unificado.py importar --tabela raw_filiados_2024")
+        print(f"    python importar_unificado.py importar --tabela raw_boletim_urna_2024 --retries 5")
         print(f"    python importar_unificado.py importar --fonte datasus --resume")
         print(f"    python importar_unificado.py purge")
         print(f"    python importar_unificado.py status\n")
