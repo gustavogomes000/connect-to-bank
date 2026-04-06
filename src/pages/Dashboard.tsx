@@ -11,6 +11,7 @@ import { formatNumber, formatPercent, getPartidoCor, CHART_COLORS, SITUACAO_CORE
 import { KPISkeleton, ChartSkeleton, TableSkeleton } from '@/components/eleicoes/Skeletons';
 import { CandidatoAvatar } from '@/components/eleicoes/CandidatoAvatar';
 import { EmptyState } from '@/components/eleicoes/EmptyState';
+import { KPIDrillDownPanel, type DrillDownType } from '@/components/eleicoes/KPIDrillDown';
 import {
   Users, CheckCircle, UserCheck, Building, MapPin, BarChart3, Vote, TrendingUp,
   PieChart as PieIcon, DollarSign, Calendar, Target,
@@ -112,19 +113,19 @@ function useComparecimentoGeral() {
 }
 
 // ── Tab: Resumo ──
-function TabResumo({ kpis, loadingKPIs, comparecimento }: any) {
+function TabResumo({ kpis, loadingKPIs, comparecimento, onDrillDown }: any) {
   const kpiCards = [
-    { icon: Users, label: 'Candidatos', value: formatNumber(kpis?.totalCandidatos), sub: 'registrados', color: 'text-[hsl(var(--chart-1))]', bgColor: 'bg-[hsl(var(--chart-1))]/10' },
-    { icon: CheckCircle, label: 'Eleitos', value: formatNumber(kpis?.totalEleitos), sub: 'eleitos/QP/média', color: 'text-success', bgColor: 'bg-success/10' },
-    { icon: UserCheck, label: 'Mulheres', value: formatPercent(kpis?.pctMulheres), sub: `${formatNumber(kpis?.totalMulheres)} candidatas`, color: 'text-secondary', bgColor: 'bg-secondary/10' },
-    { icon: Building, label: 'Partidos', value: formatNumber(kpis?.totalPartidos), sub: 'siglas', color: 'text-warning', bgColor: 'bg-warning/10' },
-    { icon: MapPin, label: 'Municípios', value: formatNumber(kpis?.totalMunicipios), sub: 'com candidatos', color: 'text-[hsl(var(--chart-5))]', bgColor: 'bg-[hsl(var(--chart-5))]/10' },
-    { icon: BarChart3, label: 'Cargos', value: formatNumber(kpis?.totalCargos), sub: 'disputados', color: 'text-[hsl(var(--chart-6))]', bgColor: 'bg-[hsl(var(--chart-6))]/10' },
+    { icon: Users, label: 'Candidatos', value: formatNumber(kpis?.totalCandidatos), sub: 'registrados', color: 'text-[hsl(var(--chart-1))]', bgColor: 'bg-[hsl(var(--chart-1))]/10', drillDown: 'candidatos' as DrillDownType },
+    { icon: CheckCircle, label: 'Eleitos', value: formatNumber(kpis?.totalEleitos), sub: 'eleitos/QP/média', color: 'text-success', bgColor: 'bg-success/10', drillDown: 'eleitos' as DrillDownType },
+    { icon: UserCheck, label: 'Mulheres', value: formatPercent(kpis?.pctMulheres), sub: `${formatNumber(kpis?.totalMulheres)} candidatas`, color: 'text-secondary', bgColor: 'bg-secondary/10', drillDown: 'mulheres' as DrillDownType },
+    { icon: Building, label: 'Partidos', value: formatNumber(kpis?.totalPartidos), sub: 'siglas', color: 'text-warning', bgColor: 'bg-warning/10', drillDown: 'partidos' as DrillDownType },
+    { icon: MapPin, label: 'Municípios', value: formatNumber(kpis?.totalMunicipios), sub: 'com candidatos', color: 'text-[hsl(var(--chart-5))]', bgColor: 'bg-[hsl(var(--chart-5))]/10', drillDown: 'municipios' as DrillDownType },
+    { icon: BarChart3, label: 'Cargos', value: formatNumber(kpis?.totalCargos), sub: 'disputados', color: 'text-[hsl(var(--chart-6))]', bgColor: 'bg-[hsl(var(--chart-6))]/10', drillDown: 'cargos' as DrillDownType },
   ];
   if (comparecimento) {
     kpiCards.push(
-      { icon: Vote, label: 'Eleitorado', value: formatNumber(comparecimento.apto), sub: 'aptos a votar', color: 'text-[hsl(var(--info))]', bgColor: 'bg-[hsl(var(--info))]/10' },
-      { icon: TrendingUp, label: 'Comparecimento', value: comparecimento.apto > 0 ? formatPercent((comparecimento.comp / comparecimento.apto) * 100) : '—', sub: `${formatNumber(comparecimento.comp)} votos`, color: 'text-success', bgColor: 'bg-success/10' },
+      { icon: Vote, label: 'Eleitorado', value: formatNumber(comparecimento.apto), sub: 'aptos a votar', color: 'text-[hsl(var(--info))]', bgColor: 'bg-[hsl(var(--info))]/10', drillDown: 'eleitorado' as DrillDownType },
+      { icon: TrendingUp, label: 'Comparecimento', value: comparecimento.apto > 0 ? formatPercent((comparecimento.comp / comparecimento.apto) * 100) : '—', sub: `${formatNumber(comparecimento.comp)} votos`, color: 'text-success', bgColor: 'bg-success/10', drillDown: 'comparecimento' as DrillDownType },
     );
   }
 
@@ -132,7 +133,11 @@ function TabResumo({ kpis, loadingKPIs, comparecimento }: any) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         {kpiCards.map((kpi, i) => (
-          <div key={i} className="bg-card rounded-lg border border-border/50 p-3 kpi-glow hover:border-primary/30 transition-all">
+          <button
+            key={i}
+            onClick={() => onDrillDown(kpi.drillDown, kpi.label)}
+            className="bg-card rounded-lg border border-border/50 p-3 kpi-glow hover:border-primary/30 transition-all text-left cursor-pointer group"
+          >
             <div className="flex items-center gap-2 mb-1.5">
               <div className={`w-6 h-6 rounded-md ${kpi.bgColor} flex items-center justify-center`}>
                 <kpi.icon className={`w-3 h-3 ${kpi.color}`} />
@@ -140,8 +145,10 @@ function TabResumo({ kpis, loadingKPIs, comparecimento }: any) {
               <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">{kpi.label}</span>
             </div>
             <p className="text-xl font-bold text-foreground metric-value">{kpi.value}</p>
-            <p className="text-[9px] text-muted-foreground mt-0.5">{kpi.sub}</p>
-          </div>
+            <p className="text-[9px] text-muted-foreground mt-0.5 group-hover:text-primary transition-colors">
+              {kpi.sub} <span className="opacity-0 group-hover:opacity-100 transition-opacity">· clique para ver →</span>
+            </p>
+          </button>
         ))}
       </div>
 
@@ -151,7 +158,7 @@ function TabResumo({ kpis, loadingKPIs, comparecimento }: any) {
           { to: '/ranking', label: 'Ranking Candidatos', desc: 'Busque e ordene todos os candidatos', icon: Users },
           { to: '/consulta', label: 'Consulta IA', desc: 'Gere visualizações com linguagem natural', icon: BarChart3 },
           { to: '/chat', label: 'Chat Eleições', desc: 'Pergunte qualquer coisa sobre os dados', icon: Vote },
-          { to: '/explorador', label: 'Explorador BigQuery', desc: 'Navegue pelas tabelas brutas', icon: TrendingUp },
+          { to: '/territorial', label: 'Goiânia & Aparecida', desc: 'Inteligência territorial detalhada', icon: MapPin },
         ].map((link) => (
           <Link key={link.to} to={link.to} className="bg-card rounded-lg border border-border/50 p-4 hover:border-primary/30 transition-all group">
             <link.icon className="w-5 h-5 text-primary mb-2 group-hover:scale-110 transition-transform" />
@@ -561,6 +568,7 @@ function TabVotos({ brancosNulos, loadingBN }: any) {
 // ── Main ──
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('resumo');
+  const [drillDown, setDrillDown] = useState<{ type: DrillDownType; title: string } | null>(null);
 
   const { data: isEmpty, isLoading: loadingEmpty } = useCheckEmpty();
   const { data: kpis, isLoading: loadingKPIs } = useKPIs();
@@ -577,6 +585,10 @@ export default function Dashboard() {
   const { data: reeleicao, isLoading: loadingReeleicao } = useTaxaReeleicao();
   const { data: comparativoAnos, isLoading: loadingComp } = useComparativoAnos();
 
+  const handleDrillDown = (type: DrillDownType, title: string) => {
+    setDrillDown({ type, title });
+  };
+
   if (loadingEmpty) return <KPISkeleton />;
   if (isEmpty) return <EmptyState />;
 
@@ -589,7 +601,7 @@ export default function Dashboard() {
       <DashboardNav active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'resumo' && (
-        <TabResumo kpis={kpis} loadingKPIs={loadingKPIs} comparecimento={comparecimento} />
+        <TabResumo kpis={kpis} loadingKPIs={loadingKPIs} comparecimento={comparecimento} onDrillDown={handleDrillDown} />
       )}
 
       {activeTab === 'partidos' && (
@@ -614,6 +626,15 @@ export default function Dashboard() {
 
       {activeTab === 'votos' && (
         <TabVotos brancosNulos={brancosNulos} loadingBN={loadingBN} />
+      )}
+
+      {/* Drill-down modal */}
+      {drillDown && (
+        <KPIDrillDownPanel
+          type={drillDown.type}
+          title={drillDown.title}
+          onClose={() => setDrillDown(null)}
+        />
       )}
     </div>
   );
