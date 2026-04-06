@@ -1,5 +1,3 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -52,31 +50,15 @@ const GENEROS_MAP: Record<string, string[]> = {
 // =============================================
 
 type Intent =
-  | "ranking_votos"
-  | "ranking_patrimonio"
-  | "total_candidatos"
-  | "total_votos"
-  | "comparecimento"
-  | "abstencao"
-  | "evolucao"
-  | "comparativo_partidos"
-  | "distribuicao_genero"
-  | "distribuicao_instrucao"
-  | "distribuicao_ocupacao"
-  | "distribuicao_idade"
-  | "bairro_comparecimento"
-  | "busca_candidato"
-  | "patrimonio_candidato"
-  | "votos_por_zona"
-  | "partidos_ranking"
-  | "locais_votacao"
-  | "resumo_eleicao"
-  | "comparativo_anos"
-  | "generico";
+  | "ranking_votos" | "ranking_patrimonio" | "total_candidatos" | "total_votos"
+  | "comparecimento" | "abstencao" | "evolucao" | "comparativo_partidos"
+  | "distribuicao_genero" | "distribuicao_instrucao" | "distribuicao_ocupacao"
+  | "distribuicao_idade" | "bairro_comparecimento" | "busca_candidato"
+  | "patrimonio_candidato" | "votos_por_zona" | "partidos_ranking"
+  | "locais_votacao" | "resumo_eleicao" | "comparativo_anos" | "generico";
 
-function detectIntent(tokens: string[], text: string): Intent {
+function detectIntent(text: string): Intent {
   const has = (...words: string[]) => words.some(w => text.includes(w));
-
   if (has("patrimônio", "patrimonio", "bens", "declarado", "mais rico", "riqueza")) {
     if (has("ranking", "top", "maiores", "mais rico")) return "ranking_patrimonio";
     return "patrimonio_candidato";
@@ -87,7 +69,7 @@ function detectIntent(tokens: string[], text: string): Intent {
     return "comparecimento";
   }
   if (has("abstenção", "abstencao", "absteve", "faltou", "ausência", "ausencia")) return "abstencao";
-  if (has("evolução", "evolucao", "ao longo", "tendência", "tendencia", "série", "serie", "histórico", "historico")) return "evolucao";
+  if (has("evolução", "evolucao", "ao longo", "tendência", "tendencia", "histórico", "historico")) return "evolucao";
   if (has("gênero", "genero", "homens e mulheres", "sexo", "feminino", "masculino")) return "distribuicao_genero";
   if (has("escolaridade", "instrução", "instrucao", "grau de instrução", "formação", "formacao", "ensino")) return "distribuicao_instrucao";
   if (has("ocupação", "ocupacao", "profissão", "profissao", "trabalha")) return "distribuicao_ocupacao";
@@ -120,48 +102,33 @@ interface Entities {
   generos: string[];
   limite: number;
   nomes: string[];
-  bairros: string[];
   zonas: number[];
   turnos: number[];
 }
 
 function extractEntities(text: string): Entities {
   const lower = text.toLowerCase();
-
-  // Years
   const yearMatches = text.match(/\b(20\d{2})\b/g);
   const anos = yearMatches ? [...new Set(yearMatches.map(Number))].filter(y => y >= 2000 && y <= 2030) : [];
-
-  // Turnos
   const turnos: number[] = [];
   if (lower.includes("primeiro turno") || lower.includes("1o turno") || lower.includes("1º turno")) turnos.push(1);
   if (lower.includes("segundo turno") || lower.includes("2o turno") || lower.includes("2º turno")) turnos.push(2);
-
-  // Limit
   let limite = 20;
   const topMatch = text.match(/top\s*(\d+)/i) || text.match(/(\d+)\s*(mais|maiores|principais|primeiros)/i);
   if (topMatch) limite = Math.min(parseInt(topMatch[1]), 200);
-
-  // Cargos
   const cargos: string[] = [];
   for (const [cargo, keywords] of Object.entries(CARGOS_MAP)) {
     if (keywords.some(k => lower.includes(k))) cargos.push(cargo);
   }
-
-  // Situações
   const situacoes: string[] = [];
   for (const [sit, keywords] of Object.entries(SITUACOES_MAP)) {
     if (keywords.some(k => lower.includes(k))) situacoes.push(sit);
   }
-
-  // Partidos
   const partidos: string[] = [];
   for (const p of PARTIDOS_CONHECIDOS) {
     const regex = new RegExp(`\\b${p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
     if (regex.test(text)) partidos.push(p);
   }
-
-  // Municípios
   const municipios: string[] = [];
   for (const m of MUNICIPIOS_PRINCIPAIS) {
     const normalized = m.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
@@ -177,40 +144,28 @@ function extractEntities(text: string): Entities {
         m.includes("AGUAS LINDAS") ? "ÁGUAS LINDAS DE GOIÁS" : m);
     }
   }
-
-  // Gêneros
   const generos: string[] = [];
   for (const [g, keywords] of Object.entries(GENEROS_MAP)) {
     if (keywords.some(k => lower.includes(k))) generos.push(g);
   }
-
-  // Zones
   const zonaMatch = text.match(/zona\s*(\d+)/gi);
   const zonas = zonaMatch ? zonaMatch.map(z => parseInt(z.replace(/\D/g, ''))) : [];
-
-  // Names (quoted text or "candidato X")
   const nomes: string[] = [];
   const quoted = text.match(/"([^"]+)"/g);
   if (quoted) nomes.push(...quoted.map(q => q.replace(/"/g, '').toUpperCase()));
-
-  return {
-    anos: [...new Set(anos)],
-    municipios: [...new Set(municipios)],
-    partidos: [...new Set(partidos)],
-    cargos: [...new Set(cargos)],
-    situacoes: [...new Set(situacoes)],
-    generos: [...new Set(generos)],
-    limite,
-    nomes,
-    bairros: [],
-    zonas: [...new Set(zonas)],
-    turnos: [...new Set(turnos)],
-  };
+  return { anos: [...new Set(anos)], municipios: [...new Set(municipios)], partidos: [...new Set(partidos)], cargos: [...new Set(cargos)], situacoes: [...new Set(situacoes)], generos: [...new Set(generos)], limite, nomes, zonas: [...new Set(zonas)], turnos: [...new Set(turnos)] };
 }
 
 // =============================================
-// SQL BUILDER
+// SQL BUILDER — MotherDuck tables
 // =============================================
+
+function candTable(ano: number) { return `my_db.candidatos_${ano}_GO`; }
+function bensTable(ano: number) { return `my_db.bens_candidatos_${ano}_GO`; }
+function votTable(ano: number) { return `my_db.votacao_munzona_${ano}_GO`; }
+function compTable(ano: number) { return `my_db.comparecimento_munzona_${ano}_GO`; }
+function compSecaoTable(ano: number) { return `my_db.comparecimento_abstencao_${ano}_GO`; }
+function votPartTable(ano: number) { return `my_db.votacao_partido_munzona_${ano}_GO`; }
 
 interface QueryPlan {
   sql: string;
@@ -219,417 +174,310 @@ interface QueryPlan {
   descricao: string;
 }
 
-function buildWhere(e: Entities, prefix: string = ""): string {
-  const p = prefix ? `${prefix}.` : "";
-  const clauses: string[] = [];
-  if (e.anos.length === 1) clauses.push(`${p}ano = ${e.anos[0]}`);
-  else if (e.anos.length > 1) clauses.push(`${p}ano IN (${e.anos.join(',')})`);
-  if (e.municipios.length === 1) clauses.push(`UPPER(${p}municipio) = '${e.municipios[0].toUpperCase()}'`);
-  else if (e.municipios.length > 1) clauses.push(`UPPER(${p}municipio) IN (${e.municipios.map(m => `'${m.toUpperCase()}'`).join(',')})`);
-  if (e.partidos.length === 1) clauses.push(`UPPER(${p}sigla_partido) = '${e.partidos[0].toUpperCase()}'`);
-  else if (e.partidos.length > 1) clauses.push(`UPPER(${p}sigla_partido) IN (${e.partidos.map(p2 => `'${p2.toUpperCase()}'`).join(',')})`);
-  if (e.cargos.length === 1) clauses.push(`UPPER(${p}cargo) ILIKE '%${e.cargos[0]}%'`);
-  else if (e.cargos.length > 1) clauses.push(`(${e.cargos.map(c => `UPPER(${p}cargo) ILIKE '%${c}%'`).join(' OR ')})`);
-  if (e.turnos.length === 1) clauses.push(`${p}turno = ${e.turnos[0]}`);
-  if (e.zonas.length === 1) clauses.push(`${p}zona = ${e.zonas[0]}`);
-  else if (e.zonas.length > 1) clauses.push(`${p}zona IN (${e.zonas.join(',')})`);
-  return clauses.length ? clauses.join(' AND ') : '';
+function buildMDWhere(e: Entities, tableAlias = ""): string {
+  const p = tableAlias ? `${tableAlias}.` : "";
+  const c: string[] = [];
+  if (e.municipios.length === 1) c.push(`${p}nm_ue = '${e.municipios[0]}'`);
+  else if (e.municipios.length > 1) c.push(`${p}nm_ue IN (${e.municipios.map(m => `'${m}'`).join(',')})`);
+  if (e.cargos.length === 1) c.push(`${p}ds_cargo ILIKE '%${e.cargos[0]}%'`);
+  if (e.turnos.length === 1) c.push(`${p}nr_turno = ${e.turnos[0]}`);
+  if (e.generos.length === 1) c.push(`${p}ds_genero = '${e.generos[0]}'`);
+  if (e.situacoes.length === 1) c.push(`${p}ds_sit_tot_turno ILIKE '%${e.situacoes[0]}%'`);
+  if (e.partidos.length === 1) c.push(`${p}sg_partido = '${e.partidos[0]}'`);
+  else if (e.partidos.length > 1) c.push(`${p}sg_partido IN (${e.partidos.map(pp => `'${pp}'`).join(',')})`);
+  return c.length ? c.join(' AND ') : '';
 }
 
-function addSituacao(e: Entities, prefix: string = ""): string {
-  const p = prefix ? `${prefix}.` : "";
-  if (e.situacoes.length === 1) return ` AND UPPER(${p}situacao_final) ILIKE '%${e.situacoes[0]}%'`;
-  return '';
-}
-
-function addGenero(e: Entities, prefix: string = ""): string {
-  const p = prefix ? `${prefix}.` : "";
-  if (e.generos.length === 1) return ` AND UPPER(${p}genero) = '${e.generos[0]}'`;
-  return '';
+function buildVotWhere(e: Entities, tableAlias = ""): string {
+  const p = tableAlias ? `${tableAlias}.` : "";
+  const c: string[] = [];
+  if (e.municipios.length === 1) c.push(`${p}nm_municipio = '${e.municipios[0]}'`);
+  else if (e.municipios.length > 1) c.push(`${p}nm_municipio IN (${e.municipios.map(m => `'${m}'`).join(',')})`);
+  if (e.cargos.length === 1) c.push(`${p}ds_cargo ILIKE '%${e.cargos[0]}%'`);
+  if (e.zonas.length === 1) c.push(`${p}nr_zona = ${e.zonas[0]}`);
+  if (e.partidos.length === 1) c.push(`${p}sg_partido = '${e.partidos[0]}'`);
+  else if (e.partidos.length > 1) c.push(`${p}sg_partido IN (${e.partidos.map(pp => `'${pp}'`).join(',')})`);
+  return c.length ? c.join(' AND ') : '';
 }
 
 function buildQuery(intent: Intent, e: Entities): QueryPlan {
-  const anoLabel = e.anos.length === 1 ? e.anos[0].toString() : e.anos.length > 1 ? e.anos.join('/') : 'todas as eleições';
-  const munLabel = e.municipios.length === 1 ? e.municipios[0] : e.municipios.length > 1 ? e.municipios.join(', ') : 'Goiás';
-  const cargoLabel = e.cargos.length === 1 ? e.cargos[0].toLowerCase() : 'todos os cargos';
-  const where = buildWhere(e);
-  const whereClause = where ? `WHERE ${where}` : '';
+  const ano = e.anos.length === 1 ? e.anos[0] : 2024;
+  const anoLabel = e.anos.length === 1 ? e.anos[0].toString() : '2024';
+  const munLabel = e.municipios.length === 1 ? e.municipios[0] : 'Goiás';
+  const cargoLabel = e.cargos.length === 1 ? e.cargos[0].toLowerCase() : 'todos';
 
   switch (intent) {
-
     case "ranking_votos": {
-      const vWhere = buildWhere(e, "v");
-      const cWhere = buildWhere(e, "c");
+      const w = buildVotWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
       return {
-        sql: `SELECT v.nome_candidato AS candidato, v.partido, SUM(v.total_votos) AS total_votos,
-          COALESCE(c.situacao_final, '-') AS situacao
-          FROM bd_eleicoes_votacao v
-          LEFT JOIN bd_eleicoes_candidatos c ON v.numero_urna = c.numero_urna AND v.ano = c.ano 
-            AND UPPER(v.municipio) = UPPER(c.municipio) AND UPPER(v.cargo) = UPPER(c.cargo)
-          ${vWhere ? `WHERE ${vWhere}` : ''}${e.situacoes.length ? addSituacao(e, 'c') : ''}${e.generos.length ? addGenero(e, 'c') : ''}
-          GROUP BY v.nome_candidato, v.partido, c.situacao_final
-          ORDER BY total_votos DESC LIMIT ${e.limite}`,
+        sql: `SELECT nm_urna_candidato AS candidato, sg_partido AS partido, sum(qt_votos_nominais) AS total_votos
+          FROM ${votTable(ano)} ${wc}
+          GROUP BY nm_urna_candidato, sg_partido ORDER BY total_votos DESC LIMIT ${e.limite}`,
         tipo_grafico: "bar",
-        titulo: `Top ${e.limite} candidatos mais votados — ${munLabel} ${anoLabel}`,
-        descricao: `Ranking de candidatos ${cargoLabel !== 'todos os cargos' ? 'para ' + cargoLabel : ''} ordenados por total de votos`,
+        titulo: `Top ${e.limite} mais votados — ${munLabel} ${anoLabel}`,
+        descricao: `Ranking de candidatos ${cargoLabel} por votos`,
       };
     }
-
     case "ranking_patrimonio": {
-      const bWhere = buildWhere(e);
       return {
-        sql: `SELECT nome_candidato AS candidato, sigla_partido AS partido,
-          SUM(valor_bem) AS patrimonio_total, COUNT(*) AS qtd_bens
-          FROM bd_eleicoes_bens_candidatos
-          ${bWhere ? `WHERE ${bWhere}` : ''}
-          GROUP BY nome_candidato, sigla_partido
-          ORDER BY patrimonio_total DESC LIMIT ${e.limite}`,
+        sql: `SELECT c.nm_urna_candidato AS candidato, c.sg_partido AS partido,
+          sum(CAST(b.vr_bem_candidato AS DOUBLE)) AS patrimonio_total, count(*) AS qtd_bens
+          FROM ${bensTable(ano)} b
+          JOIN ${candTable(ano)} c ON b.sq_candidato = c.sq_candidato
+          ${e.municipios.length ? `WHERE c.nm_ue = '${e.municipios[0]}'` : ''}
+          GROUP BY c.nm_urna_candidato, c.sg_partido ORDER BY patrimonio_total DESC LIMIT ${e.limite}`,
         tipo_grafico: "bar",
-        titulo: `Top ${e.limite} candidatos com maior patrimônio — ${anoLabel}`,
-        descricao: `Patrimônio total declarado dos candidatos ${munLabel}`,
+        titulo: `Top ${e.limite} maior patrimônio — ${anoLabel}`,
+        descricao: `Patrimônio total declarado dos candidatos`,
       };
     }
-
     case "patrimonio_candidato": {
       if (e.nomes.length > 0) {
         return {
-          sql: `SELECT tipo_bem, descricao_bem AS descricao, valor_bem AS valor
-            FROM bd_eleicoes_bens_candidatos
-            WHERE UPPER(nome_candidato) ILIKE '%${e.nomes[0]}%'
-            ${e.anos.length === 1 ? `AND ano = ${e.anos[0]}` : ''}
-            ORDER BY valor_bem DESC LIMIT 50`,
+          sql: `SELECT ds_tipo_bem_candidato AS tipo, ds_bem_candidato AS descricao, CAST(vr_bem_candidato AS DOUBLE) AS valor
+            FROM ${bensTable(ano)} WHERE UPPER(nm_candidato) ILIKE '%${e.nomes[0]}%' OR sq_candidato IN (
+              SELECT sq_candidato FROM ${candTable(ano)} WHERE nm_urna_candidato ILIKE '%${e.nomes[0]}%'
+            ) ORDER BY valor DESC LIMIT 50`,
           tipo_grafico: "table",
-          titulo: `Bens declarados — ${e.nomes[0]}`,
-          descricao: `Lista detalhada dos bens declarados pelo candidato`,
+          titulo: `Bens — ${e.nomes[0]}`,
+          descricao: `Bens declarados pelo candidato`,
         };
       }
       return buildQuery("ranking_patrimonio", e);
     }
-
     case "total_candidatos": {
+      const w = buildMDWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
       return {
-        sql: `SELECT ano, cargo, COUNT(*) AS total_candidatos,
-          COUNT(CASE WHEN genero = 'FEMININO' THEN 1 END) AS mulheres,
-          COUNT(CASE WHEN genero = 'MASCULINO' THEN 1 END) AS homens
-          FROM bd_eleicoes_candidatos
-          ${whereClause}${addGenero(e)}${addSituacao(e)}
-          GROUP BY ano, cargo ORDER BY ano DESC, total_candidatos DESC LIMIT 100`,
+        sql: `SELECT ds_cargo AS cargo, count(*) AS total,
+          count(CASE WHEN ds_genero = 'FEMININO' THEN 1 END) AS mulheres,
+          count(CASE WHEN ds_genero = 'MASCULINO' THEN 1 END) AS homens
+          FROM ${candTable(ano)} ${wc}
+          GROUP BY ds_cargo ORDER BY total DESC`,
         tipo_grafico: "table",
         titulo: `Total de candidatos — ${munLabel} ${anoLabel}`,
-        descricao: `Contagem de candidatos por ano e cargo`,
+        descricao: `Contagem por cargo`,
       };
     }
-
-    case "total_votos": {
-      return {
-        sql: `SELECT ano, cargo, SUM(total_votos) AS votos_totais,
-          COUNT(DISTINCT nome_candidato) AS candidatos
-          FROM bd_eleicoes_votacao
-          ${whereClause}
-          GROUP BY ano, cargo ORDER BY ano DESC, votos_totais DESC LIMIT 50`,
-        tipo_grafico: "table",
-        titulo: `Total de votos — ${munLabel} ${anoLabel}`,
-        descricao: `Soma total de votos por ano e cargo`,
-      };
-    }
-
     case "comparecimento": {
+      const w = buildVotWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
       return {
-        sql: `SELECT ano, municipio, turno,
-          SUM(eleitorado_apto) AS eleitores_aptos,
-          SUM(comparecimento) AS comparecimento,
-          SUM(abstencoes) AS abstencoes,
-          ROUND(SUM(comparecimento)::numeric * 100.0 / NULLIF(SUM(eleitorado_apto), 0), 1) AS taxa_comparecimento
-          FROM bd_eleicoes_comparecimento
-          ${whereClause}
-          GROUP BY ano, municipio, turno ORDER BY ano DESC, municipio LIMIT 100`,
-        tipo_grafico: e.anos.length > 1 || e.anos.length === 0 ? "line" : "bar",
-        titulo: `Comparecimento eleitoral — ${munLabel} ${anoLabel}`,
-        descricao: `Dados de comparecimento, abstenção e taxa de participação`,
-      };
-    }
-
-    case "abstencao": {
-      return {
-        sql: `SELECT ano, municipio,
-          SUM(abstencoes) AS total_abstencoes,
-          SUM(eleitorado_apto) AS eleitores_aptos,
-          ROUND(SUM(abstencoes)::numeric * 100.0 / NULLIF(SUM(eleitorado_apto), 0), 1) AS taxa_abstencao
-          FROM bd_eleicoes_comparecimento
-          ${whereClause}
-          GROUP BY ano, municipio ORDER BY taxa_abstencao DESC LIMIT 50`,
+        sql: `SELECT nm_municipio AS municipio, sum(qt_aptos) AS eleitores, sum(qt_comparecimento) AS comparecimento,
+          sum(qt_abstencoes) AS abstencoes,
+          ROUND(sum(qt_comparecimento) * 100.0 / NULLIF(sum(qt_aptos), 0), 1) AS taxa_comp
+          FROM ${compTable(ano)} ${wc}
+          GROUP BY nm_municipio ORDER BY eleitores DESC LIMIT 50`,
         tipo_grafico: "bar",
-        titulo: `Abstenção eleitoral — ${munLabel} ${anoLabel}`,
-        descricao: `Taxa de abstenção por município/ano`,
+        titulo: `Comparecimento — ${munLabel} ${anoLabel}`,
+        descricao: `Dados de comparecimento e abstenção`,
       };
     }
-
-    case "evolucao": {
-      // If talking about comparecimento
+    case "abstencao": {
+      const w = buildVotWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
       return {
-        sql: `SELECT ano,
-          SUM(eleitorado_apto) AS eleitores_aptos,
-          SUM(comparecimento) AS comparecimento,
-          SUM(abstencoes) AS abstencoes,
-          ROUND(SUM(comparecimento)::numeric * 100.0 / NULLIF(SUM(eleitorado_apto), 0), 1) AS taxa_comparecimento
-          FROM bd_eleicoes_comparecimento
-          ${where ? `WHERE ${where} AND turno = 1` : 'WHERE turno = 1'}
-          GROUP BY ano ORDER BY ano LIMIT 20`,
-        tipo_grafico: "line",
-        titulo: `Evolução eleitoral — ${munLabel}`,
-        descricao: `Série histórica de comparecimento e abstenção`,
+        sql: `SELECT nm_municipio AS municipio, sum(qt_abstencoes) AS abstencoes, sum(qt_aptos) AS eleitores,
+          ROUND(sum(qt_abstencoes) * 100.0 / NULLIF(sum(qt_aptos), 0), 1) AS taxa_abstencao
+          FROM ${compTable(ano)} ${wc}
+          GROUP BY nm_municipio ORDER BY taxa_abstencao DESC LIMIT 30`,
+        tipo_grafico: "bar",
+        titulo: `Abstenção — ${anoLabel}`,
+        descricao: `Taxa de abstenção por município`,
       };
     }
-
+    case "evolucao": {
+      const mun = e.municipios.length === 1 ? e.municipios[0] : 'GOIÂNIA';
+      const anos = [2014, 2016, 2018, 2020, 2022, 2024];
+      const unions = anos.map(a =>
+        `SELECT ${a} AS ano, sum(qt_aptos) AS eleitores, sum(qt_comparecimento) AS comparecimento, sum(qt_abstencoes) AS abstencoes FROM ${compTable(a)} WHERE nm_municipio = '${mun}' AND nr_turno = 1`
+      ).join(' UNION ALL ');
+      return {
+        sql: `SELECT * FROM (${unions}) ORDER BY ano`,
+        tipo_grafico: "line",
+        titulo: `Evolução eleitoral — ${mun}`,
+        descricao: `Série histórica de comparecimento`,
+      };
+    }
+    case "distribuicao_genero": {
+      const w = buildMDWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
+      return {
+        sql: `SELECT ds_genero AS genero, count(*) AS total FROM ${candTable(ano)} ${wc} GROUP BY ds_genero ORDER BY total DESC`,
+        tipo_grafico: "pie",
+        titulo: `Distribuição por gênero — ${anoLabel}`,
+        descricao: `Candidatos por gênero`,
+      };
+    }
+    case "distribuicao_instrucao": {
+      const w = buildMDWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
+      return {
+        sql: `SELECT ds_grau_instrucao AS escolaridade, count(*) AS total FROM ${candTable(ano)} ${wc} GROUP BY ds_grau_instrucao ORDER BY total DESC`,
+        tipo_grafico: "bar",
+        titulo: `Escolaridade dos candidatos — ${anoLabel}`,
+        descricao: `Distribuição por grau de instrução`,
+      };
+    }
+    case "distribuicao_ocupacao": {
+      const w = buildMDWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
+      return {
+        sql: `SELECT ds_ocupacao AS ocupacao, count(*) AS total FROM ${candTable(ano)} ${wc} GROUP BY ds_ocupacao ORDER BY total DESC LIMIT 15`,
+        tipo_grafico: "bar",
+        titulo: `Ocupações dos candidatos — ${anoLabel}`,
+        descricao: `Top ocupações declaradas`,
+      };
+    }
+    case "distribuicao_idade": {
+      const w = buildMDWhere(e, '');
+      const wc = w ? `WHERE ${w} AND nr_idade_data_posse > 0` : 'WHERE nr_idade_data_posse > 0';
+      return {
+        sql: `SELECT CASE
+          WHEN nr_idade_data_posse <= 25 THEN '18-25'
+          WHEN nr_idade_data_posse <= 35 THEN '26-35'
+          WHEN nr_idade_data_posse <= 45 THEN '36-45'
+          WHEN nr_idade_data_posse <= 55 THEN '46-55'
+          WHEN nr_idade_data_posse <= 65 THEN '56-65'
+          ELSE '66+'
+          END AS faixa, count(*) AS total
+          FROM ${candTable(ano)} ${wc} GROUP BY faixa ORDER BY faixa`,
+        tipo_grafico: "bar",
+        titulo: `Faixa etária dos candidatos — ${anoLabel}`,
+        descricao: `Distribuição por idade`,
+      };
+    }
+    case "bairro_comparecimento": {
+      const mun = e.municipios.length === 1 ? e.municipios[0] : 'GOIÂNIA';
+      return {
+        sql: `SELECT nm_bairro AS bairro, sum(qt_aptos) AS eleitores, sum(qt_comparecimento) AS comparecimento,
+          sum(qt_abstencoes) AS abstencoes,
+          ROUND(sum(qt_comparecimento) * 100.0 / NULLIF(sum(qt_aptos), 0), 1) AS taxa_comp
+          FROM ${compSecaoTable(ano)} WHERE nm_municipio = '${mun}'
+          GROUP BY nm_bairro ORDER BY eleitores DESC LIMIT 30`,
+        tipo_grafico: "bar",
+        titulo: `Bairros — ${mun} ${anoLabel}`,
+        descricao: `Comparecimento por bairro`,
+      };
+    }
+    case "busca_candidato": {
+      if (e.nomes.length > 0) {
+        const w = buildMDWhere(e);
+        const extra = w ? ` AND ${w}` : '';
+        return {
+          sql: `SELECT nm_urna_candidato AS candidato, nm_candidato AS nome_completo, sg_partido AS partido,
+            ds_cargo AS cargo, nm_ue AS municipio, ds_sit_tot_turno AS situacao, ds_genero AS genero,
+            ds_grau_instrucao AS escolaridade, ds_ocupacao AS ocupacao, dt_nascimento AS nascimento
+            FROM ${candTable(ano)} WHERE nm_urna_candidato ILIKE '%${e.nomes[0]}%' OR nm_candidato ILIKE '%${e.nomes[0]}%'${extra}
+            LIMIT 20`,
+          tipo_grafico: "table",
+          titulo: `Busca: ${e.nomes[0]}`,
+          descricao: `Candidatos encontrados`,
+        };
+      }
+      const w = buildMDWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
+      return {
+        sql: `SELECT nm_urna_candidato AS candidato, sg_partido AS partido, ds_cargo AS cargo, nm_ue AS municipio, ds_sit_tot_turno AS situacao
+          FROM ${candTable(ano)} ${wc} ORDER BY nm_urna_candidato LIMIT 30`,
+        tipo_grafico: "table",
+        titulo: `Candidatos — ${munLabel} ${anoLabel}`,
+        descricao: `Lista de candidatos`,
+      };
+    }
+    case "votos_por_zona": {
+      const mun = e.municipios.length === 1 ? e.municipios[0] : 'GOIÂNIA';
+      return {
+        sql: `SELECT nr_zona AS zona, sum(qt_aptos) AS eleitores, sum(qt_comparecimento) AS comparecimento,
+          ROUND(sum(qt_comparecimento) * 100.0 / NULLIF(sum(qt_aptos), 0), 1) AS taxa_comp
+          FROM ${compTable(ano)} WHERE nm_municipio = '${mun}'
+          GROUP BY nr_zona ORDER BY zona`,
+        tipo_grafico: "bar",
+        titulo: `Zonas eleitorais — ${mun} ${anoLabel}`,
+        descricao: `Comparecimento por zona`,
+      };
+    }
     case "comparativo_partidos": {
       if (e.partidos.length >= 2) {
         const pList = e.partidos.map(p => `'${p}'`).join(',');
+        const mun = e.municipios.length === 1 ? `AND nm_municipio = '${e.municipios[0]}'` : '';
+        const cargo = e.cargos.length === 1 ? `AND ds_cargo ILIKE '%${e.cargos[0]}%'` : '';
         return {
-          sql: `SELECT sigla_partido AS partido, SUM(total_votos) AS votos_totais,
-            SUM(votos_nominais) AS votos_nominais, SUM(votos_legenda) AS votos_legenda
-            FROM bd_eleicoes_votacao_partido
-            WHERE UPPER(sigla_partido) IN (${pList})
-            ${e.anos.length === 1 ? ` AND ano = ${e.anos[0]}` : ''}
-            ${e.cargos.length ? ` AND UPPER(cargo) ILIKE '%${e.cargos[0]}%'` : ''}
-            ${e.municipios.length === 1 ? ` AND UPPER(municipio) = '${e.municipios[0]}'` : ''}
-            GROUP BY sigla_partido ORDER BY votos_totais DESC`,
+          sql: `SELECT sg_partido AS partido, sum(qt_votos_nominais) AS votos_nominais, sum(qt_votos_legenda) AS votos_legenda
+            FROM ${votPartTable(ano)} WHERE sg_partido IN (${pList}) ${mun} ${cargo}
+            GROUP BY sg_partido ORDER BY votos_nominais DESC`,
           tipo_grafico: "bar",
-          titulo: `Comparativo ${e.partidos.join(' × ')} — ${anoLabel}`,
-          descricao: `Votos totais, nominais e de legenda entre partidos`,
+          titulo: `${e.partidos.join(' × ')} — ${anoLabel}`,
+          descricao: `Comparativo de votos entre partidos`,
         };
       }
       return buildQuery("partidos_ranking", e);
     }
-
     case "partidos_ranking": {
+      const mun = e.municipios.length === 1 ? `WHERE nm_municipio = '${e.municipios[0]}'` : '';
       return {
-        sql: `SELECT sigla_partido AS partido, SUM(total_votos) AS votos_totais,
-          SUM(votos_nominais) AS votos_nominais, SUM(votos_legenda) AS votos_legenda
-          FROM bd_eleicoes_votacao_partido
-          ${whereClause}
-          GROUP BY sigla_partido ORDER BY votos_totais DESC LIMIT ${e.limite}`,
+        sql: `SELECT sg_partido AS partido, sum(qt_votos_nominais) AS votos_nominais, sum(qt_votos_legenda) AS votos_legenda
+          FROM ${votPartTable(ano)} ${mun}
+          GROUP BY sg_partido ORDER BY votos_nominais DESC LIMIT ${e.limite}`,
         tipo_grafico: "bar",
         titulo: `Ranking de partidos — ${munLabel} ${anoLabel}`,
-        descricao: `Partidos ordenados por total de votos`,
+        descricao: `Votos nominais e de legenda por partido`,
       };
     }
-
-    case "distribuicao_genero": {
-      return {
-        sql: `SELECT genero, COUNT(*) AS total,
-          ROUND(COUNT(*)::numeric * 100.0 / SUM(COUNT(*)) OVER(), 1) AS percentual
-          FROM bd_eleicoes_candidatos
-          ${whereClause}${addSituacao(e)}
-          GROUP BY genero ORDER BY total DESC`,
-        tipo_grafico: "pie",
-        titulo: `Distribuição por gênero — ${cargoLabel} ${munLabel} ${anoLabel}`,
-        descricao: `Proporção de candidatos por gênero`,
-      };
-    }
-
-    case "distribuicao_instrucao": {
-      return {
-        sql: `SELECT grau_instrucao AS escolaridade, COUNT(*) AS total,
-          ROUND(COUNT(*)::numeric * 100.0 / SUM(COUNT(*)) OVER(), 1) AS percentual
-          FROM bd_eleicoes_candidatos
-          ${whereClause}${addGenero(e)}${addSituacao(e)}
-          GROUP BY grau_instrucao ORDER BY total DESC`,
-        tipo_grafico: "bar",
-        titulo: `Escolaridade dos candidatos — ${munLabel} ${anoLabel}`,
-        descricao: `Distribuição por grau de instrução`,
-      };
-    }
-
-    case "distribuicao_ocupacao": {
-      return {
-        sql: `SELECT ocupacao, COUNT(*) AS total
-          FROM bd_eleicoes_candidatos
-          ${whereClause}${addGenero(e)}${addSituacao(e)}
-          GROUP BY ocupacao ORDER BY total DESC LIMIT ${e.limite}`,
-        tipo_grafico: "bar",
-        titulo: `Ocupações dos candidatos — ${munLabel} ${anoLabel}`,
-        descricao: `Profissões mais comuns entre candidatos`,
-      };
-    }
-
-    case "distribuicao_idade": {
-      return {
-        sql: `SELECT
-          CASE
-            WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(data_nascimento, 'YYYY-MM-DD'))) < 30 THEN '18-29'
-            WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(data_nascimento, 'YYYY-MM-DD'))) < 40 THEN '30-39'
-            WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(data_nascimento, 'YYYY-MM-DD'))) < 50 THEN '40-49'
-            WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, TO_DATE(data_nascimento, 'YYYY-MM-DD'))) < 60 THEN '50-59'
-            ELSE '60+'
-          END AS faixa_etaria,
-          COUNT(*) AS total
-          FROM bd_eleicoes_candidatos
-          WHERE data_nascimento IS NOT NULL AND data_nascimento != ''
-          ${where ? `AND ${where}` : ''}${addGenero(e)}${addSituacao(e)}
-          GROUP BY faixa_etaria ORDER BY faixa_etaria`,
-        tipo_grafico: "bar",
-        titulo: `Faixa etária dos candidatos — ${munLabel} ${anoLabel}`,
-        descricao: `Distribuição por idade dos candidatos`,
-      };
-    }
-
-    case "bairro_comparecimento": {
-      return {
-        sql: `SELECT bairro, local_votacao,
-          SUM(eleitorado_apto) AS eleitores_aptos,
-          SUM(comparecimento) AS comparecimento,
-          SUM(abstencoes) AS abstencoes,
-          ROUND(SUM(comparecimento)::numeric * 100.0 / NULLIF(SUM(eleitorado_apto), 0), 1) AS taxa_comparecimento
-          FROM bd_eleicoes_comparecimento_secao
-          WHERE bairro IS NOT NULL
-          ${e.anos.length === 1 ? ` AND ano = ${e.anos[0]}` : ''}
-          ${e.municipios.length === 1 ? ` AND UPPER(municipio) = '${e.municipios[0]}'` : ''}
-          GROUP BY bairro, local_votacao ORDER BY eleitores_aptos DESC LIMIT ${e.limite}`,
-        tipo_grafico: "table",
-        titulo: `Comparecimento por bairro — ${munLabel} ${anoLabel}`,
-        descricao: `Dados de comparecimento detalhados por local de votação`,
-      };
-    }
-
-    case "busca_candidato": {
-      if (e.nomes.length > 0) {
-        return {
-          sql: `SELECT nome_completo, nome_urna, sigla_partido AS partido, cargo, municipio,
-            numero_urna, situacao_candidatura, situacao_final, genero, grau_instrucao, ocupacao, ano
-            FROM bd_eleicoes_candidatos
-            WHERE UPPER(nome_completo) ILIKE '%${e.nomes[0]}%' OR UPPER(nome_urna) ILIKE '%${e.nomes[0]}%'
-            ${e.anos.length === 1 ? ` AND ano = ${e.anos[0]}` : ''}
-            ORDER BY ano DESC LIMIT 20`,
-          tipo_grafico: "table",
-          titulo: `Resultados para "${e.nomes[0]}"`,
-          descricao: `Dados encontrados para o candidato pesquisado`,
-        };
-      }
-      // Fallback to generic search
-      return {
-        sql: `SELECT nome_urna, sigla_partido AS partido, cargo, municipio, situacao_final, ano
-          FROM bd_eleicoes_candidatos
-          ${whereClause}${addGenero(e)}${addSituacao(e)}
-          ORDER BY ano DESC LIMIT ${e.limite}`,
-        tipo_grafico: "table",
-        titulo: `Candidatos — ${munLabel} ${anoLabel}`,
-        descricao: `Lista de candidatos com filtros aplicados`,
-      };
-    }
-
-    case "votos_por_zona": {
-      return {
-        sql: `SELECT zona, SUM(total_votos) AS votos_totais,
-          COUNT(DISTINCT nome_candidato) AS candidatos
-          FROM bd_eleicoes_votacao
-          ${whereClause}
-          GROUP BY zona ORDER BY votos_totais DESC LIMIT 50`,
-        tipo_grafico: "bar",
-        titulo: `Votos por zona eleitoral — ${munLabel} ${anoLabel}`,
-        descricao: `Distribuição de votos por zona`,
-      };
-    }
-
     case "locais_votacao": {
+      const mun = e.municipios.length === 1 ? e.municipios[0] : 'GOIÂNIA';
       return {
-        sql: `SELECT local_votacao, bairro, endereco_local AS endereco,
-          SUM(eleitorado_apto) AS eleitores, COUNT(DISTINCT secao) AS secoes
-          FROM bd_eleicoes_locais_votacao
-          ${whereClause}
-          GROUP BY local_votacao, bairro, endereco_local
-          ORDER BY eleitores DESC LIMIT ${e.limite}`,
+        sql: `SELECT nm_local_votacao AS local, nm_bairro AS bairro, sum(qt_aptos) AS eleitores, sum(qt_comparecimento) AS comparecimento
+          FROM ${compSecaoTable(ano)} WHERE nm_municipio = '${mun}'
+          GROUP BY nm_local_votacao, nm_bairro ORDER BY eleitores DESC LIMIT 30`,
         tipo_grafico: "table",
-        titulo: `Locais de votação — ${munLabel} ${anoLabel}`,
-        descricao: `Colégios eleitorais e quantidade de eleitores`,
+        titulo: `Locais de votação — ${mun} ${anoLabel}`,
+        descricao: `Escolas e colégios eleitorais`,
       };
     }
-
     case "resumo_eleicao": {
+      const w = buildMDWhere(e);
+      const wc = w ? `WHERE ${w}` : '';
       return {
-        sql: `SELECT
-          (SELECT COUNT(*) FROM bd_eleicoes_candidatos ${whereClause}) AS total_candidatos,
-          (SELECT COUNT(DISTINCT sigla_partido) FROM bd_eleicoes_candidatos ${whereClause}) AS total_partidos,
-          (SELECT COUNT(DISTINCT municipio) FROM bd_eleicoes_candidatos ${whereClause}) AS total_municipios,
-          (SELECT SUM(total_votos) FROM bd_eleicoes_votacao ${whereClause}) AS total_votos,
-          (SELECT SUM(eleitorado_apto) FROM bd_eleicoes_comparecimento ${whereClause ? whereClause + ' AND turno = 1' : 'WHERE turno = 1'}) AS eleitorado_apto,
-          (SELECT SUM(comparecimento) FROM bd_eleicoes_comparecimento ${whereClause ? whereClause + ' AND turno = 1' : 'WHERE turno = 1'}) AS comparecimento`,
+        sql: `SELECT count(*) AS total_candidatos,
+          count(CASE WHEN ds_sit_tot_turno ILIKE '%ELEITO%' AND ds_sit_tot_turno NOT ILIKE '%NÃO ELEITO%' THEN 1 END) AS eleitos,
+          count(CASE WHEN ds_genero = 'FEMININO' THEN 1 END) AS mulheres,
+          count(DISTINCT sg_partido) AS partidos,
+          count(DISTINCT nm_ue) AS municipios,
+          count(DISTINCT ds_cargo) AS cargos
+          FROM ${candTable(ano)} ${wc}`,
         tipo_grafico: "kpi",
-        titulo: `Resumo da eleição — ${munLabel} ${anoLabel}`,
-        descricao: `Visão geral com indicadores-chave`,
+        titulo: `Resumo — ${munLabel} ${anoLabel}`,
+        descricao: `Visão geral da eleição`,
       };
     }
-
     case "comparativo_anos": {
+      const mun = e.municipios.length === 1 ? `WHERE nm_ue = '${e.municipios[0]}'` : '';
+      const anos = [2016, 2018, 2020, 2022, 2024];
+      const unions = anos.map(a =>
+        `SELECT ${a} AS ano, count(*) AS candidatos,
+          count(CASE WHEN ds_sit_tot_turno ILIKE '%ELEITO%' AND ds_sit_tot_turno NOT ILIKE '%NÃO ELEITO%' THEN 1 END) AS eleitos,
+          count(CASE WHEN ds_genero = 'FEMININO' THEN 1 END) AS mulheres
+          FROM ${candTable(a)} ${mun}`
+      ).join(' UNION ALL ');
       return {
-        sql: `SELECT ano, COUNT(*) AS candidatos,
-          COUNT(DISTINCT sigla_partido) AS partidos,
-          COUNT(CASE WHEN genero = 'FEMININO' THEN 1 END) AS mulheres
-          FROM bd_eleicoes_candidatos
-          ${e.municipios.length === 1 ? `WHERE UPPER(municipio) = '${e.municipios[0]}'` : ''}
-          ${e.cargos.length === 1 ? `${e.municipios.length ? ' AND' : 'WHERE'} UPPER(cargo) ILIKE '%${e.cargos[0]}%'` : ''}
-          GROUP BY ano ORDER BY ano`,
+        sql: `SELECT * FROM (${unions}) ORDER BY ano`,
         tipo_grafico: "line",
         titulo: `Comparativo entre eleições — ${munLabel}`,
-        descricao: `Evolução de candidatos, partidos e representação feminina`,
+        descricao: `Evolução de candidatos, eleitos e mulheres`,
       };
     }
-
     default: {
-      // Generic: try to build something useful based on entities
-      if (e.partidos.length > 0) return buildQuery("partidos_ranking", e);
-      if (e.nomes.length > 0) return buildQuery("busca_candidato", e);
+      // generico — use AI
       return {
-        sql: `SELECT nome_urna AS candidato, sigla_partido AS partido, cargo, municipio,
-          situacao_final, ano
-          FROM bd_eleicoes_candidatos
-          ${whereClause}${addGenero(e)}${addSituacao(e)}
-          ORDER BY ano DESC, nome_urna LIMIT ${e.limite}`,
+        sql: "",
         tipo_grafico: "table",
-        titulo: `Resultados — ${munLabel} ${anoLabel}`,
-        descricao: `Dados encontrados com base na sua consulta`,
+        titulo: "Consulta genérica",
+        descricao: "",
       };
     }
   }
-}
-
-// =============================================
-// RESPONSE BUILDER
-// =============================================
-
-function buildTextResponse(intent: Intent, e: Entities, dados: any[], titulo: string): string {
-  if (!dados || dados.length === 0) {
-    return `Não encontrei dados para sua consulta. Tente especificar um ano (ex: 2024), município (ex: Goiânia) ou cargo (ex: vereador).`;
-  }
-
-  const count = dados.length;
-  let msg = `Encontrei **${count} resultado${count > 1 ? 's' : ''}** para sua consulta.\n\n`;
-
-  switch (intent) {
-    case "ranking_votos":
-      msg += `🏆 **${dados[0]?.candidato || ''}** lidera com **${Number(dados[0]?.total_votos || 0).toLocaleString('pt-BR')}** votos`;
-      if (dados[1]) msg += `, seguido por **${dados[1]?.candidato}** com ${Number(dados[1]?.total_votos || 0).toLocaleString('pt-BR')} votos`;
-      msg += '.';
-      break;
-    case "ranking_patrimonio":
-      msg += `💰 **${dados[0]?.candidato || ''}** possui o maior patrimônio declarado: **R$ ${Number(dados[0]?.patrimonio_total || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}**`;
-      break;
-    case "comparecimento":
-      if (dados[0]?.taxa_comparecimento) msg += `📊 Taxa de comparecimento: **${dados[0].taxa_comparecimento}%**`;
-      break;
-    case "distribuicao_genero":
-      msg += dados.map(d => `• ${d.genero}: **${d.total}** (${d.percentual}%)`).join('\n');
-      break;
-    case "resumo_eleicao":
-      if (dados[0]) {
-        const d = dados[0];
-        msg += `📋 **${Number(d.total_candidatos || 0).toLocaleString('pt-BR')}** candidatos de **${d.total_partidos}** partidos em **${d.total_municipios}** municípios`;
-      }
-      break;
-    default:
-      msg += `Os dados estão exibidos na visualização abaixo.`;
-  }
-
-  return msg;
 }
 
 // =============================================
@@ -643,83 +491,147 @@ Deno.serve(async (req) => {
 
   try {
     const { pergunta } = await req.json();
-    if (!pergunta || typeof pergunta !== "string" || pergunta.trim().length < 3) {
-      return new Response(JSON.stringify({ erro: "Pergunta muito curta. Tente algo como: 'Top 10 vereadores mais votados em Goiânia 2024'" }), {
+    if (!pergunta || typeof pergunta !== "string" || pergunta.length < 3) {
+      return new Response(JSON.stringify({ erro: "Pergunta inválida" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const text = pergunta.trim();
-    const textLower = text.toLowerCase();
-    const tokens = textLower.split(/\s+/);
+    const lower = pergunta.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const intent = detectIntent(lower);
+    const entities = extractEntities(pergunta);
 
-    // Extract entities and detect intent
-    const entities = extractEntities(text);
-    const intent = detectIntent(tokens, textLower);
+    // Default year to 2024 if none specified
+    if (entities.anos.length === 0) entities.anos = [2024];
 
-    // Build query
-    const plan = buildQuery(intent, entities);
+    let plan = buildQuery(intent, entities);
+
+    // For generic intent, use AI to generate SQL
+    if (intent === "generico" || !plan.sql) {
+      const lovableKey = Deno.env.get("LOVABLE_API_KEY");
+      if (lovableKey) {
+        try {
+          const aiRes = await fetch("https://ai-gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${lovableKey}` },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                { role: "system", content: `Gere SQL DuckDB para MotherDuck. Tabelas: my_db.candidatos_YYYY_GO (colunas: ano_eleicao, nm_candidato, nm_urna_candidato, sg_partido, ds_cargo, nm_ue, ds_genero, ds_grau_instrucao, ds_ocupacao, ds_sit_tot_turno, sq_candidato, nr_candidato, dt_nascimento, nr_idade_data_posse), my_db.votacao_munzona_YYYY_GO (nm_municipio, nr_zona, nm_urna_candidato, sg_partido, ds_cargo, qt_votos_nominais), my_db.comparecimento_munzona_YYYY_GO (nm_municipio, nr_zona, qt_aptos, qt_comparecimento, qt_abstencoes, qt_votos_brancos, qt_votos_nulos), my_db.bens_candidatos_YYYY_GO (sq_candidato, ds_tipo_bem_candidato, vr_bem_candidato VARCHAR), my_db.comparecimento_abstencao_YYYY_GO (nm_municipio, nm_bairro, nm_local_votacao, qt_aptos, qt_comparecimento). Anos: 2012-2024. CAST vr_bem_candidato AS DOUBLE para somas. Use LIMIT 200. Responda APENAS JSON: {"sql":"...","tipo_grafico":"bar|pie|line|area|table|kpi","titulo":"...","descricao":"..."}. NUNCA invente dados. APENAS use tabelas listadas.` },
+                { role: "user", content: pergunta },
+              ],
+              temperature: 0.1,
+              max_tokens: 1500,
+            }),
+          });
+          if (aiRes.ok) {
+            const aiData = await aiRes.json();
+            const raw = aiData?.choices?.[0]?.message?.content || "";
+            const match = raw.match(/\{[\s\S]*\}/);
+            if (match) {
+              const parsed = JSON.parse(match[0]);
+              plan = { sql: parsed.sql, tipo_grafico: parsed.tipo_grafico || "table", titulo: parsed.titulo || "Resultado", descricao: parsed.descricao || "" };
+            }
+          }
+        } catch (aiErr) {
+          console.error("AI fallback error:", aiErr);
+        }
+      }
+    }
+
+    if (!plan.sql) {
+      return new Response(JSON.stringify({
+        sucesso: true,
+        resposta_texto: "Desculpe, não consegui entender sua pergunta. Tente perguntar sobre candidatos, votos, partidos, comparecimento, patrimônio, bairros ou evolução eleitoral em Goiás.",
+        tipo_grafico: "table",
+        titulo: "Não entendi",
+        descricao: "",
+        colunas: [],
+        dados: [],
+        intent,
+        entities_encontradas: entities,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     // Safety check
-    const sqlUpper = plan.sql.toUpperCase().trim();
-    if (!sqlUpper.startsWith("SELECT") || /\b(DROP|DELETE|INSERT|UPDATE|ALTER|TRUNCATE|CREATE)\b/.test(sqlUpper)) {
-      return new Response(JSON.stringify({ erro: "Query bloqueada por segurança" }), {
+    const sqlUp = plan.sql.toUpperCase().trim();
+    if (!sqlUp.startsWith("SELECT") && !sqlUp.startsWith("WITH")) {
+      return new Response(JSON.stringify({ erro: "Query não permitida" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Execute SQL
-    const supabaseUrl = Deno.env.get("EXTERNAL_SUPABASE_URL") || Deno.env.get("SUPABASE_URL") || "";
-    const supabaseKey = Deno.env.get("EXTERNAL_SUPABASE_SERVICE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const dbClient = createClient(supabaseUrl, supabaseKey);
-
-    // Try using rpc execute_readonly_query
-    const { data: queryResult, error: queryError } = await dbClient.rpc('execute_readonly_query' as any, {
-      query_text: plan.sql
-    }) as any;
-
-    if (queryError) {
-      console.error("Query error:", queryError.message, "SQL:", plan.sql);
-      return new Response(JSON.stringify({
-        sucesso: false,
-        erro: `Erro ao executar consulta: ${queryError.message}`,
-        sql_gerado: plan.sql,
-        intent,
-        entities_encontradas: {
-          anos: entities.anos, municipios: entities.municipios, partidos: entities.partidos,
-          cargos: entities.cargos, limite: entities.limite,
-        },
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // Execute via MotherDuck
+    const mdToken = Deno.env.get("MOTHERDUCK_TOKEN");
+    if (!mdToken) {
+      return new Response(JSON.stringify({ erro: "MOTHERDUCK_TOKEN não configurado" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const dados = Array.isArray(queryResult) ? queryResult : [];
-    const colunas = dados.length > 0 ? Object.keys(dados[0]) : [];
-
-    // Build text response
-    const resposta_texto = buildTextResponse(intent, entities, dados, plan.titulo);
-
-    return new Response(JSON.stringify({
-      sucesso: true,
-      tipo_grafico: plan.tipo_grafico,
-      titulo: plan.titulo,
-      descricao: plan.descricao,
-      resposta_texto,
-      colunas,
-      dados,
-      sql_gerado: plan.sql,
-      intent,
-      entities_encontradas: {
-        anos: entities.anos, municipios: entities.municipios, partidos: entities.partidos,
-        cargos: entities.cargos, situacoes: entities.situacoes, generos: entities.generos,
-      },
-    }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    const { default: postgres } = await import("https://deno.land/x/postgresjs@v3.4.5/mod.js");
+    const pg = postgres({
+      hostname: "pg.us-east-1-aws.motherduck.com",
+      port: 5432,
+      username: "postgres",
+      password: mdToken,
+      database: "md:",
+      ssl: "require",
+      connection: { application_name: "eleicoesgo-chat" },
+      max: 1,
+      idle_timeout: 5,
+      connect_timeout: 15,
     });
 
+    try {
+      const rows = await pg.unsafe(plan.sql);
+      await pg.end();
+
+      const dados = Array.isArray(rows) ? rows.map((r: any) => ({ ...r })) : [];
+      const colunas = dados.length > 0 ? Object.keys(dados[0]) : [];
+
+      // Generate response text
+      let resposta = plan.descricao || plan.titulo;
+      if (dados.length === 0) {
+        resposta = `Não encontrei dados para sua consulta sobre "${pergunta}". Tente ajustar os filtros (ano, município, cargo).`;
+      } else if (plan.tipo_grafico === "kpi" && dados.length === 1) {
+        const kpiParts = colunas.map(c => `**${c.replace(/_/g, ' ')}**: ${Number(dados[0][c]).toLocaleString('pt-BR')}`);
+        resposta = `${plan.titulo}\n\n${kpiParts.join('\n')}`;
+      } else {
+        resposta = `${plan.titulo}: ${dados.length} resultado(s) encontrado(s). ${plan.descricao}`;
+      }
+
+      return new Response(JSON.stringify({
+        sucesso: true,
+        tipo_grafico: plan.tipo_grafico,
+        titulo: plan.titulo,
+        descricao: plan.descricao,
+        resposta_texto: resposta,
+        colunas,
+        dados,
+        sql_gerado: plan.sql,
+        intent,
+        entities_encontradas: entities,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    } catch (queryErr: any) {
+      await pg.end().catch(() => {});
+      console.error("Query error:", queryErr.message, "SQL:", plan.sql);
+      return new Response(JSON.stringify({
+        sucesso: false,
+        erro: queryErr.message,
+        resposta_texto: `Erro ao executar a consulta: ${queryErr.message}`,
+        tipo_grafico: "table",
+        titulo: "Erro",
+        descricao: "",
+        colunas: [],
+        dados: [],
+        sql_gerado: plan.sql,
+        intent,
+        entities_encontradas: entities,
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
   } catch (e: any) {
-    console.error("Chat Error:", e);
+    console.error("Error:", e);
     return new Response(JSON.stringify({ erro: e.message || "Erro interno" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
