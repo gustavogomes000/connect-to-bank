@@ -568,6 +568,7 @@ function TabVotos({ brancosNulos, loadingBN }: any) {
 // ── Main ──
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<TabId>('resumo');
+  const [drillDown, setDrillDown] = useState<{ type: DrillDownType; title: string } | null>(null);
 
   const { data: isEmpty, isLoading: loadingEmpty } = useCheckEmpty();
   const { data: kpis, isLoading: loadingKPIs } = useKPIs();
@@ -584,6 +585,10 @@ export default function Dashboard() {
   const { data: reeleicao, isLoading: loadingReeleicao } = useTaxaReeleicao();
   const { data: comparativoAnos, isLoading: loadingComp } = useComparativoAnos();
 
+  const handleDrillDown = (type: DrillDownType, title: string) => {
+    setDrillDown({ type, title });
+  };
+
   if (loadingEmpty) return <KPISkeleton />;
   if (isEmpty) return <EmptyState />;
 
@@ -596,7 +601,7 @@ export default function Dashboard() {
       <DashboardNav active={activeTab} onChange={setActiveTab} />
 
       {activeTab === 'resumo' && (
-        <TabResumo kpis={kpis} loadingKPIs={loadingKPIs} comparecimento={comparecimento} />
+        <TabResumo kpis={kpis} loadingKPIs={loadingKPIs} comparecimento={comparecimento} onDrillDown={handleDrillDown} />
       )}
 
       {activeTab === 'partidos' && (
@@ -621,6 +626,15 @@ export default function Dashboard() {
 
       {activeTab === 'votos' && (
         <TabVotos brancosNulos={brancosNulos} loadingBN={loadingBN} />
+      )}
+
+      {/* Drill-down modal */}
+      {drillDown && (
+        <KPIDrillDownPanel
+          type={drillDown.type}
+          title={drillDown.title}
+          onClose={() => setDrillDown(null)}
+        />
       )}
     </div>
   );
