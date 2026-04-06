@@ -631,6 +631,8 @@ export default function Dashboard() {
 
       <MotherDuckStatusCard />
 
+      <DashboardNav active={activeTab} onChange={setActiveTab} />
+
       {activeTab === 'resumo' && (
         <TabResumo kpis={kpis} loadingKPIs={loadingKPIs} comparecimento={comparecimento} onDrillDown={handleDrillDown} />
       )}
