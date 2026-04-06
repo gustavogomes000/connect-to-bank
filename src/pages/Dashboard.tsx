@@ -629,7 +629,7 @@ export default function Dashboard() {
         <h1 className="text-lg font-bold text-foreground">EleiçõesGO — Visão Geral</h1>
       </div>
 
-      <DashboardNav active={activeTab} onChange={setActiveTab} />
+      <MotherDuckStatusCard />
 
       {activeTab === 'resumo' && (
         <TabResumo kpis={kpis} loadingKPIs={loadingKPIs} comparecimento={comparecimento} onDrillDown={handleDrillDown} />
