@@ -20,13 +20,14 @@ import PerfilCandidatos from "./pages/PerfilCandidatos";
 import ImportarDados from "./pages/ImportarDados";
 import Configuracoes from "./pages/Configuracoes";
 import Ajuda from "./pages/Ajuda";
+import InteligenciaTerritorial from "./pages/InteligenciaTerritorial";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
 function Layout() {
   const location = useLocation();
-  const hideFilters = ['/importar', '/ajuda', '/consulta', '/explorador', '/chat', '/config'].includes(location.pathname);
+  const hideFilters = ['/importar', '/ajuda', '/consulta', '/explorador', '/chat', '/config', '/territorial'].includes(location.pathname);
 
   return (
     <SidebarProvider>
@@ -53,6 +54,7 @@ function Layout() {
               <Route path="/municipio" element={<PorMunicipio />} />
               <Route path="/partido" element={<PorPartido />} />
               <Route path="/bairro" element={<AnaliseBairro />} />
+              <Route path="/territorial" element={<InteligenciaTerritorial />} />
               <Route path="/patrimonio" element={<Patrimonio />} />
               <Route path="/perfil-candidatos" element={<PerfilCandidatos />} />
               <Route path="/importar" element={<ImportarDados />} />
