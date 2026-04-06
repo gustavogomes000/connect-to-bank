@@ -53,33 +53,21 @@ ORDER BY table_name;
 -- Como bens não tem CD_MUNICIPIO direto, filtrar via JOIN com candidatos:
 -- ────────────────────────────────────────────────────────────
 
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2014` AS
-SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2014` b
-JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2014` c
-  ON b.SQ_CANDIDATO = c.SQ_CANDIDATO
-WHERE c.CD_MUNICIPIO IN ('93734', '91758');
+-- BENS ESTADUAIS (2014, 2018, 2022) → GO inteiro (candidatos concorrem no estado todo)
+CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2014` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2014`;
+CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2018`;
+CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2022`;
 
+-- BENS MUNICIPAIS (2016, 2020, 2024) → GYN+APA
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2016` AS
 SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2016` b
 JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2016` c
   ON b.SQ_CANDIDATO = c.SQ_CANDIDATO
 WHERE c.CD_MUNICIPIO IN ('93734', '91758');
 
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2018` AS
-SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2018` b
-JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2018` c
-  ON b.SQ_CANDIDATO = c.SQ_CANDIDATO
-WHERE c.CD_MUNICIPIO IN ('93734', '91758');
-
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2020` AS
 SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2020` b
 JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2020` c
-  ON b.SQ_CANDIDATO = c.SQ_CANDIDATO
-WHERE c.CD_MUNICIPIO IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2022` AS
-SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2022` b
-JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2022` c
   ON b.SQ_CANDIDATO = c.SQ_CANDIDATO
 WHERE c.CD_MUNICIPIO IN ('93734', '91758');
 
@@ -263,23 +251,18 @@ WHERE CD_MUNICIPIO IN ('93734', '91758');
 -- Receitas podem ter CD_MUNICIPIO direto no TSE
 -- ────────────────────────────────────────────────────────────
 
+-- RECEITAS ESTADUAIS (2018, 2022) → GO inteiro
+CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2018`;
+CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2022`;
+
+-- RECEITAS MUNICIPAIS (2016, 2020, 2024) → GYN+APA
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2016` AS
 SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2016` r
 WHERE r.CD_MUNICIPIO IN ('93734', '91758')
    OR r.SG_UE IN ('93734', '91758');
 
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2018` AS
-SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2018` r
-WHERE r.CD_MUNICIPIO IN ('93734', '91758')
-   OR r.SG_UE IN ('93734', '91758');
-
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2020` AS
 SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2020` r
-WHERE r.CD_MUNICIPIO IN ('93734', '91758')
-   OR r.SG_UE IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2022` AS
-SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2022` r
 WHERE r.CD_MUNICIPIO IN ('93734', '91758')
    OR r.SG_UE IN ('93734', '91758');
 
@@ -293,23 +276,18 @@ WHERE r.CD_MUNICIPIO IN ('93734', '91758')
 -- 2J. DESPESAS → GYN+APA
 -- ────────────────────────────────────────────────────────────
 
+-- DESPESAS ESTADUAIS (2018, 2022) → GO inteiro
+CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2018`;
+CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2022`;
+
+-- DESPESAS MUNICIPAIS (2016, 2020, 2024) → GYN+APA
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2016` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2016`
 WHERE CD_MUNICIPIO IN ('93734', '91758')
    OR SG_UE IN ('93734', '91758');
 
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2018` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2018`
-WHERE CD_MUNICIPIO IN ('93734', '91758')
-   OR SG_UE IN ('93734', '91758');
-
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758')
-   OR SG_UE IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2022`
 WHERE CD_MUNICIPIO IN ('93734', '91758')
    OR SG_UE IN ('93734', '91758');
 
@@ -337,12 +315,10 @@ WHERE SG_UE IN ('93734', '91758') OR CD_MUNICIPIO IN ('93734', '91758');
 -- 2L. REDES SOCIAIS → GYN+APA (via JOIN candidatos)
 -- ────────────────────────────────────────────────────────────
 
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2022` AS
-SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2022` r
-JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2022` c
-  ON r.SQ_CANDIDATO = c.SQ_CANDIDATO
-WHERE c.CD_MUNICIPIO IN ('93734', '91758');
+-- REDES SOCIAIS 2022 → GO inteiro (estadual)
+CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2022`;
 
+-- REDES SOCIAIS 2024 → GYN+APA (municipal)
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2024` AS
 SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2024` r
 JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2024` c
