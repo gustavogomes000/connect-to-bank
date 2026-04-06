@@ -15,41 +15,51 @@ function useDiretorio(cidade: string, search: string, cargo: string | null, part
   return useQuery({
     queryKey: ['diretorio', cidade, search, cargo, partido, genero, situacao, page, pageSize, sortBy, sortAsc],
     queryFn: async () => {
-      const conds: string[] = [];
-      if (cidade === 'GOIÂNIA') conds.push(`${COL.municipio} = 'GOIÂNIA'`);
-      else if (cidade === 'APARECIDA DE GOIÂNIA') conds.push(`${COL.municipio} = 'APARECIDA DE GOIÂNIA'`);
-      else conds.push(`${COL.municipio} IN ('GOIÂNIA', 'APARECIDA DE GOIÂNIA')`);
+      try {
+        const conds: string[] = [];
+        if (cidade === 'GOIÂNIA') conds.push(`${COL.municipio} = 'GOIÂNIA'`);
+        else if (cidade === 'APARECIDA DE GOIÂNIA') conds.push(`${COL.municipio} = 'APARECIDA DE GOIÂNIA'`);
+        else conds.push(`${COL.municipio} IN ('GOIÂNIA', 'APARECIDA DE GOIÂNIA')`);
 
-      if (search) conds.push(`(${COL.nomeUrna} ILIKE '%${search.replace(/'/g, "''")}%' OR ${COL.nomeCompleto} ILIKE '%${search.replace(/'/g, "''")}%')`);
-      if (cargo) conds.push(`${COL.cargo} ILIKE '%${cargo.replace(/'/g, "''")}%'`);
-      if (partido) conds.push(`${COL.partido} = '${partido.replace(/'/g, "''")}'`);
-      if (genero) conds.push(`${COL.genero} = '${genero.replace(/'/g, "''")}'`);
-      if (situacao) conds.push(`${COL.situacaoFinal} ILIKE '%${situacao.replace(/'/g, "''")}%'`);
+        if (search) conds.push(`(${COL.nomeUrna} ILIKE '%${search.replace(/'/g, "''")}%' OR ${COL.nomeCompleto} ILIKE '%${search.replace(/'/g, "''")}%')`);
+        if (cargo) conds.push(`${COL.cargo} ILIKE '%${cargo.replace(/'/g, "''")}%'`);
+        if (partido) conds.push(`${COL.partido} = '${partido.replace(/'/g, "''")}'`);
+        if (genero) conds.push(`${COL.genero} = '${genero.replace(/'/g, "''")}'`);
+        if (situacao) conds.push(`${COL.situacaoFinal} ILIKE '%${situacao.replace(/'/g, "''")}%'`);
 
-      const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-      const sortMap: Record<string, string> = {
-        nome_urna: COL.nomeUrna, nome_completo: COL.nomeCompleto, sigla_partido: COL.partido,
-        cargo: COL.cargo, municipio: COL.municipio, ano: COL.ano,
-      };
-      const orderCol = sortMap[sortBy] || COL.nomeUrna;
-      const dir = sortAsc ? 'ASC' : 'DESC';
-      const offset = page * pageSize;
+        const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+        const sortMap: Record<string, string> = {
+          nome_urna: COL.nomeUrna, nome_completo: COL.nomeCompleto, sigla_partido: COL.partido,
+          cargo: COL.cargo, municipio: COL.municipio, ano: COL.ano,
+        };
+        const orderCol = sortMap[sortBy] || COL.nomeUrna;
+        const dir = sortAsc ? 'ASC' : 'DESC';
+        const offset = page * pageSize;
 
-      const [countRes, dataRes] = await Promise.all([
-        mdQuery<{total: string}>(`SELECT count(*) as total FROM ${MD.candidatos(2024)} ${where}`),
-        mdQuery(
-          `SELECT ${COL.sequencial} as id, ${COL.nomeUrna} as nome_urna, ${COL.nomeCompleto} as nome_completo,
+        const countSql = `SELECT count(*) as total FROM ${MD.candidatos(2024)} ${where}`;
+        const dataSql = `SELECT ${COL.sequencial} as id, ${COL.nomeUrna} as nome_urna, ${COL.nomeCompleto} as nome_completo,
             ${COL.partido} as sigla_partido, ${COL.cargo} as cargo, ${COL.municipio} as municipio,
             ${COL.ano} as ano, ${COL.genero} as genero, ${COL.escolaridade} as grau_instrucao,
             ${COL.ocupacao} as ocupacao, ${COL.situacaoFinal} as situacao_final,
             ${COL.numero} as numero_urna
           FROM ${MD.candidatos(2024)} ${where}
-          ORDER BY ${orderCol} ${dir} LIMIT ${pageSize} OFFSET ${offset}`
-        ),
-      ]);
+          ORDER BY ${orderCol} ${dir} LIMIT ${pageSize} OFFSET ${offset}`;
 
-      return { data: dataRes, count: Number(countRes[0]?.total || 0) };
+        console.log('[Diretorio] countSql:', countSql);
+        console.log('[Diretorio] dataSql:', dataSql);
+
+        const [countRes, dataRes] = await Promise.all([
+          mdQuery<{total: string}>(countSql),
+          mdQuery(dataSql),
+        ]);
+
+        return { data: dataRes, count: Number(countRes[0]?.total || 0) };
+      } catch (err) {
+        console.error('[Diretorio] Query error:', err);
+        throw err;
+      }
     },
+    retry: 1,
   });
 }
 
@@ -96,7 +106,7 @@ export default function DiretorioCandidatos() {
     setTimer(setTimeout(() => { setDebouncedSearch(v); setPage(0); }, 300));
   };
 
-  const { data, isLoading } = useDiretorio(cidade, debouncedSearch, cargo, partido, genero, situacao, page, pageSize, sortBy, sortAsc);
+  const { data, isLoading, error } = useDiretorio(cidade, debouncedSearch, cargo, partido, genero, situacao, page, pageSize, sortBy, sortAsc);
   const { data: filterOpts } = useFilterOptionsDiretorio();
 
   const clearFilters = () => {
@@ -167,7 +177,12 @@ export default function DiretorioCandidatos() {
         {hasFilters && <button onClick={clearFilters} className="text-xs text-destructive hover:underline ml-1">Limpar filtros</button>}
       </div>
 
-      {isLoading ? <TableSkeleton /> : viewMode === 'grid' ? (
+      {error ? (
+        <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-6 text-center">
+          <p className="text-sm text-destructive font-medium mb-1">Erro ao carregar dados</p>
+          <p className="text-xs text-muted-foreground">{(error as Error).message}</p>
+        </div>
+      ) : isLoading ? <TableSkeleton /> : viewMode === 'grid' ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {(data?.data || []).map((c: any) => (
             <button key={c.id} onClick={() => navigate(`/candidato/${c.id}`)}
