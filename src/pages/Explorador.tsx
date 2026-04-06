@@ -1,162 +1,288 @@
 import { useState, useMemo } from 'react';
-import { useExplorador } from '@/hooks/useEleicoes';
+import { useTabelas, useSchema, useBQQuery, type BQQueryParams } from '@/hooks/useBigQuery';
 import { formatNumber } from '@/lib/eleicoes';
-import { CandidatoAvatar } from '@/components/eleicoes/CandidatoAvatar';
-import { SituacaoBadge } from '@/components/eleicoes/SituacaoBadge';
-import { TableSkeleton } from '@/components/eleicoes/Skeletons';
+import { Database, Table2, Search, ChevronLeft, ChevronRight, ArrowUpDown, Loader2, Filter, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, ArrowUpDown, Database, Download } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-
-const COLUMNS = [
-  { key: 'nome_urna', label: 'Nome Urna', width: 'min-w-[160px]' },
-  { key: 'numero_urna', label: 'Nº', width: 'min-w-[60px]' },
-  { key: 'sigla_partido', label: 'Partido', width: 'min-w-[80px]' },
-  { key: 'cargo', label: 'Cargo', width: 'min-w-[120px]' },
-  { key: 'municipio', label: 'Município', width: 'min-w-[140px]' },
-  { key: 'ano', label: 'Ano', width: 'min-w-[60px]' },
-  { key: 'genero', label: 'Gênero', width: 'min-w-[90px]' },
-  { key: 'grau_instrucao', label: 'Escolaridade', width: 'min-w-[160px]' },
-  { key: 'ocupacao', label: 'Ocupação', width: 'min-w-[160px]' },
-  { key: 'situacao_final', label: 'Situação', width: 'min-w-[120px]' },
-];
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function Explorador() {
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
-  const [sortBy, setSortBy] = useState('nome_urna');
-  const [sortAsc, setSortAsc] = useState(true);
-  const [visibleCols, setVisibleCols] = useState<string[]>(COLUMNS.map(c => c.key));
-  const navigate = useNavigate();
+  const { data: tabelas, isLoading: loadingTabelas } = useTabelas();
+  const [tabelaSelecionada, setTabelaSelecionada] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(0);
+  const [limite, setLimite] = useState(50);
+  const [ordenar, setOrdenar] = useState<string | null>(null);
+  const [ordemDesc, setOrdemDesc] = useState(false);
+  const [buscaColuna, setBuscaColuna] = useState('');
+  const [buscaValor, setBuscaValor] = useState('');
+  const [buscaAtiva, setBuscaAtiva] = useState<{ coluna: string; valor: string } | undefined>();
+  const [filtroTabela, setFiltroTabela] = useState('');
 
-  const { data, isLoading } = useExplorador(page, pageSize, sortBy, sortAsc);
-  const totalPages = Math.ceil((data?.count || 0) / pageSize);
+  const { data: schema } = useSchema(tabelaSelecionada);
 
-  const toggleSort = (col: string) => {
-    if (sortBy === col) setSortAsc(!sortAsc);
-    else { setSortBy(col); setSortAsc(col === 'nome_urna'); }
-  };
+  const queryParams = useMemo<BQQueryParams | null>(() => {
+    if (!tabelaSelecionada) return null;
+    return {
+      tabela: tabelaSelecionada,
+      limite,
+      offset: pagina * limite,
+      ordenar: ordenar || undefined,
+      ordem: ordemDesc ? 'DESC' : 'ASC',
+      busca: buscaAtiva,
+    };
+  }, [tabelaSelecionada, pagina, limite, ordenar, ordemDesc, buscaAtiva]);
 
-  const toggleCol = (col: string) => {
-    setVisibleCols(prev => prev.includes(col) ? prev.filter(c => c !== col) : [...prev, col]);
-  };
+  const { data: resultado, isLoading: loadingQuery, isFetching } = useBQQuery(queryParams);
 
-  const activeCols = COLUMNS.filter(c => visibleCols.includes(c.key));
+  const tabelasFiltradas = useMemo(() => {
+    if (!tabelas) return [];
+    if (!filtroTabela) return tabelas;
+    return tabelas.filter(t => t.nome.toLowerCase().includes(filtroTabela.toLowerCase()));
+  }, [tabelas, filtroTabela]);
+
+  const totalPaginas = resultado ? Math.ceil(resultado.total / limite) : 0;
+
+  function selecionarTabela(nome: string) {
+    setTabelaSelecionada(nome);
+    setPagina(0);
+    setOrdenar(null);
+    setOrdemDesc(false);
+    setBuscaAtiva(undefined);
+    setBuscaColuna('');
+    setBuscaValor('');
+  }
+
+  function toggleOrdem(col: string) {
+    if (ordenar === col) {
+      setOrdemDesc(!ordemDesc);
+    } else {
+      setOrdenar(col);
+      setOrdemDesc(false);
+    }
+    setPagina(0);
+  }
+
+  function executarBusca() {
+    if (buscaColuna && buscaValor) {
+      setBuscaAtiva({ coluna: buscaColuna, valor: buscaValor });
+      setPagina(0);
+    }
+  }
+
+  function limparBusca() {
+    setBuscaAtiva(undefined);
+    setBuscaColuna('');
+    setBuscaValor('');
+    setPagina(0);
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Database className="w-5 h-5 text-primary" />
-            Explorador de Dados
-          </h1>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {formatNumber(data?.count || 0)} registros — use os filtros globais para refinar
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={pageSize.toString()} onValueChange={v => { setPageSize(parseInt(v)); setPage(0); }}>
-            <SelectTrigger className="w-[100px] h-8 text-xs bg-muted/50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10 / pág</SelectItem>
-              <SelectItem value="25">25 / pág</SelectItem>
-              <SelectItem value="50">50 / pág</SelectItem>
-              <SelectItem value="100">100 / pág</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* Column toggles */}
-      <div className="flex flex-wrap gap-1">
-        {COLUMNS.map(col => (
-          <button
-            key={col.key}
-            onClick={() => toggleCol(col.key)}
-            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-              visibleCols.includes(col.key)
-                ? 'bg-primary/20 text-primary border border-primary/30'
-                : 'bg-muted/50 text-muted-foreground border border-border/30'
-            }`}
-          >
-            {col.label}
-          </button>
-        ))}
-      </div>
-
-      {isLoading ? <TableSkeleton /> : (
-        <div className="bg-card rounded-lg border border-border/50 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs table-striped">
-              <thead>
-                <tr className="border-b border-border/30 bg-muted/30">
-                  <th className="px-3 py-2.5 font-medium text-muted-foreground w-8">#</th>
-                  <th className="py-2.5 font-medium text-muted-foreground w-8"></th>
-                  {activeCols.map(col => (
-                    <th
-                      key={col.key}
-                      className={`py-2.5 px-2 font-medium text-muted-foreground cursor-pointer hover:text-primary select-none ${col.width}`}
-                      onClick={() => toggleSort(col.key)}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        {col.label}
-                        <ArrowUpDown className={`w-3 h-3 ${sortBy === col.key ? 'text-primary' : 'opacity-30'}`} />
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.data || []).map((r: any, idx: number) => (
-                  <tr
-                    key={r.id}
-                    className="border-b border-border/20 last:border-0 cursor-pointer hover:bg-primary/5 transition-colors"
-                    onClick={() => navigate(`/candidato/${r.id}`)}
-                  >
-                    <td className="px-3 py-2 text-muted-foreground">{page * pageSize + idx + 1}</td>
-                    <td className="py-2"><CandidatoAvatar nome={r.nome_urna || r.nome_completo} fotoUrl={r.foto_url} size={24} /></td>
-                    {activeCols.map(col => (
-                      <td key={col.key} className="py-2 px-2">
-                        {col.key === 'situacao_final' ? (
-                          <SituacaoBadge situacao={r[col.key]} />
-                        ) : (
-                          <span className={col.key === 'nome_urna' ? 'font-medium' : ''}>
-                            {r[col.key] ?? '—'}
-                          </span>
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+    <div className="flex gap-3 h-[calc(100vh-7rem)]">
+      {/* Sidebar: Lista de tabelas */}
+      <div className="w-64 shrink-0 bg-card rounded-lg border border-border/50 flex flex-col">
+        <div className="p-3 border-b border-border/30">
+          <div className="flex items-center gap-2 mb-2">
+            <Database className="w-4 h-4 text-primary" />
+            <span className="text-xs font-semibold text-foreground">BigQuery Explorer</span>
           </div>
+          <Input
+            placeholder="Filtrar tabelas..."
+            value={filtroTabela}
+            onChange={e => setFiltroTabela(e.target.value)}
+            className="h-7 text-xs"
+          />
+        </div>
+        <ScrollArea className="flex-1">
+          <div className="p-1">
+            {loadingTabelas ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              tabelasFiltradas.map(t => (
+                <button
+                  key={t.nome}
+                  onClick={() => selecionarTabela(t.nome)}
+                  className={`w-full text-left px-2 py-1.5 rounded text-xs hover:bg-accent/50 transition-colors flex items-center justify-between group ${
+                    tabelaSelecionada === t.nome ? 'bg-primary/10 text-primary' : 'text-muted-foreground'
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 truncate">
+                    <Table2 className="w-3 h-3 shrink-0" />
+                    <span className="truncate">{t.nome.replace('raw_', '')}</span>
+                  </span>
+                  <span className="text-[10px] opacity-60 shrink-0">{formatNumber(Number(t.linhas))}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </ScrollArea>
+        <div className="p-2 border-t border-border/30 text-[10px] text-muted-foreground text-center">
+          {tabelas?.length || 0} tabelas • {tabelas?.reduce((s, t) => s + Number(t.linhas), 0)?.toLocaleString('pt-BR')} registros
+        </div>
+      </div>
 
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border/30">
-            <span className="text-xs text-muted-foreground">
-              {formatNumber(data?.count || 0)} resultados — Página {page + 1} de {totalPages || 1}
-            </span>
-            <div className="flex gap-1">
-              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(0)} className="h-7 text-xs px-2">
-                ««
-              </Button>
-              <Button variant="outline" size="sm" disabled={page === 0} onClick={() => setPage(page - 1)} className="h-7 px-2">
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(page + 1)} className="h-7 px-2">
-                <ChevronRight className="w-3.5 h-3.5" />
-              </Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(totalPages - 1)} className="h-7 text-xs px-2">
-                »»
-              </Button>
+      {/* Main: Data viewer */}
+      <div className="flex-1 flex flex-col min-w-0 bg-card rounded-lg border border-border/50">
+        {!tabelaSelecionada ? (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground">
+            <div className="text-center">
+              <Database className="w-12 h-12 mx-auto mb-3 opacity-20" />
+              <p className="text-sm font-medium">Selecione uma tabela</p>
+              <p className="text-xs mt-1">Clique em uma tabela à esquerda para explorar os dados</p>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <>
+            {/* Header */}
+            <div className="p-3 border-b border-border/30 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Table2 className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-semibold text-foreground">{tabelaSelecionada}</span>
+                  {resultado && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {formatNumber(resultado.total)} registros
+                    </Badge>
+                  )}
+                  {isFetching && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Select value={String(limite)} onValueChange={v => { setLimite(Number(v)); setPagina(0); }}>
+                    <SelectTrigger className="h-7 w-20 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[25, 50, 100, 200, 500].map(n => (
+                        <SelectItem key={n} value={String(n)} className="text-xs">{n} linhas</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Search bar */}
+              <div className="flex items-center gap-2">
+                <Filter className="w-3 h-3 text-muted-foreground shrink-0" />
+                {schema && (
+                  <Select value={buscaColuna} onValueChange={setBuscaColuna}>
+                    <SelectTrigger className="h-7 w-44 text-xs">
+                      <SelectValue placeholder="Coluna..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {schema.map(c => (
+                        <SelectItem key={c.column_name} value={c.column_name} className="text-xs">
+                          {c.column_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <Input
+                  placeholder="Buscar valor..."
+                  value={buscaValor}
+                  onChange={e => setBuscaValor(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && executarBusca()}
+                  className="h-7 text-xs flex-1 max-w-xs"
+                />
+                <Button size="sm" variant="outline" className="h-7 text-xs px-2" onClick={executarBusca} disabled={!buscaColuna || !buscaValor}>
+                  <Search className="w-3 h-3 mr-1" />Buscar
+                </Button>
+                {buscaAtiva && (
+                  <Button size="sm" variant="ghost" className="h-7 text-xs px-2 text-destructive" onClick={limparBusca}>
+                    <X className="w-3 h-3 mr-1" />Limpar
+                  </Button>
+                )}
+              </div>
+
+              {/* Schema pills */}
+              {schema && (
+                <div className="flex flex-wrap gap-1">
+                  {schema.slice(0, 20).map(c => (
+                    <Badge key={c.column_name} variant="outline" className="text-[9px] py-0 px-1.5 font-mono">
+                      {c.column_name}
+                      <span className="ml-1 text-muted-foreground">{c.data_type}</span>
+                    </Badge>
+                  ))}
+                  {schema.length > 20 && (
+                    <Badge variant="outline" className="text-[9px] py-0 px-1.5">+{schema.length - 20}</Badge>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Table */}
+            <div className="flex-1 overflow-auto">
+              {loadingQuery ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                  <span className="ml-2 text-sm text-muted-foreground">Consultando BigQuery...</span>
+                </div>
+              ) : resultado && resultado.linhas.length > 0 ? (
+                <table className="w-full text-xs border-collapse">
+                  <thead className="sticky top-0 bg-card z-10">
+                    <tr>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground border-b border-border/30 w-10">#</th>
+                      {resultado.colunas.map(col => (
+                        <th
+                          key={col}
+                          className="px-2 py-1.5 text-left text-[10px] font-medium text-muted-foreground border-b border-border/30 cursor-pointer hover:text-foreground whitespace-nowrap"
+                          onClick={() => toggleOrdem(col)}
+                        >
+                          <span className="flex items-center gap-1">
+                            {col}
+                            {ordenar === col && (
+                              <ArrowUpDown className={`w-2.5 h-2.5 text-primary ${ordemDesc ? 'rotate-180' : ''}`} />
+                            )}
+                          </span>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {resultado.linhas.map((row, i) => (
+                      <tr key={i} className="border-b border-border/10 hover:bg-accent/20 transition-colors">
+                        <td className="px-2 py-1 text-[10px] text-muted-foreground">{pagina * limite + i + 1}</td>
+                        {resultado.colunas.map(col => (
+                          <td key={col} className="px-2 py-1 max-w-[200px] truncate" title={row[col]}>
+                            {row[col] || <span className="text-muted-foreground/40">null</span>}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="flex items-center justify-center py-16 text-muted-foreground text-sm">
+                  Nenhum resultado encontrado
+                </div>
+              )}
+            </div>
+
+            {/* Pagination */}
+            {resultado && resultado.total > limite && (
+              <div className="p-2 border-t border-border/30 flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  {formatNumber(pagina * limite + 1)}–{formatNumber(Math.min((pagina + 1) * limite, resultado.total))} de {formatNumber(resultado.total)}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="ghost" className="h-6 px-2" disabled={pagina === 0} onClick={() => setPagina(p => p - 1)}>
+                    <ChevronLeft className="w-3 h-3" />
+                  </Button>
+                  <span className="text-muted-foreground px-2">
+                    {pagina + 1} / {totalPaginas}
+                  </span>
+                  <Button size="sm" variant="ghost" className="h-6 px-2" disabled={pagina >= totalPaginas - 1} onClick={() => setPagina(p => p + 1)}>
+                    <ChevronRight className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
