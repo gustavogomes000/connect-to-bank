@@ -19,6 +19,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json()
     const sql = body?.query
+    const database = body?.database || 'md:'
 
     if (!sql || typeof sql !== 'string') {
       return new Response(
@@ -27,38 +28,47 @@ Deno.serve(async (req) => {
       )
     }
 
-    // Safety: only allow SELECT statements
+    // Safety: only allow read-only statements
     const trimmed = sql.trim().toUpperCase()
-    if (!trimmed.startsWith('SELECT') && !trimmed.startsWith('DESCRIBE') && !trimmed.startsWith('SHOW') && !trimmed.startsWith('WITH')) {
+    if (!trimmed.startsWith('SELECT') && !trimmed.startsWith('DESCRIBE') && !trimmed.startsWith('SHOW') && !trimmed.startsWith('WITH') && !trimmed.startsWith('PRAGMA')) {
       return new Response(
         JSON.stringify({ error: 'Apenas queries SELECT/WITH/DESCRIBE/SHOW são permitidas' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const mdResponse = await fetch('https://api.motherduck.com/v1/queries', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json',
+    // Connect to MotherDuck via Postgres wire protocol
+    const { default: postgres } = await import('https://deno.land/x/postgresjs@v3.4.5/mod.js')
+
+    const pgSql = postgres({
+      hostname: 'pg.us-east-1-aws.motherduck.com',
+      port: 5432,
+      username: 'postgres',
+      password: token,
+      database: database,
+      ssl: 'require',
+      connection: {
+        application_name: 'eleicoesgo-edge',
       },
-      body: JSON.stringify({ sql }),
+      max: 1,
+      idle_timeout: 5,
+      connect_timeout: 15,
     })
 
-    const mdData = await mdResponse.json()
+    try {
+      const rows = await pgSql.unsafe(sql)
+      const columns = rows.columns?.map((c: any) => ({ name: c.name, type: c.type })) || []
 
-    if (!mdResponse.ok) {
-      console.error('MotherDuck error:', mdData)
+      await pgSql.end()
+
       return new Response(
-        JSON.stringify({ error: 'Erro no MotherDuck', details: mdData }),
-        { status: mdResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ columns, rows, rowCount: rows.length }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    } catch (queryErr) {
+      await pgSql.end().catch(() => {})
+      throw queryErr
     }
-
-    return new Response(
-      JSON.stringify(mdData),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
   } catch (err) {
     console.error('query-motherduck error:', err)
     return new Response(
