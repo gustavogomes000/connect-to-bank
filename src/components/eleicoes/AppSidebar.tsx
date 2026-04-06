@@ -1,7 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   BarChart3, Trophy, Building2, Target, MapPin, DollarSign, UserCheck,
-  Database, HelpCircle, TrendingUp, Sparkles,
+  Database, HelpCircle, TrendingUp, Sparkles, MessageSquare,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -14,6 +14,7 @@ const analysisItems = [
   { title: 'Ranking', url: '/ranking', icon: Trophy },
   { title: 'Explorador', url: '/explorador', icon: TrendingUp },
   { title: 'Consulta IA', url: '/consulta', icon: Sparkles },
+  { title: 'Chat Eleições', url: '/chat', icon: MessageSquare },
 ];
 
 const dimensionItems = [

@@ -10,6 +10,7 @@ import Dashboard from "./pages/Dashboard";
 import Ranking from "./pages/Ranking";
 import Explorador from "./pages/Explorador";
 import ConsultaIA from "./pages/ConsultaIA";
+import ChatEleicoes from "./pages/ChatEleicoes";
 import CandidatoPerfil from "./pages/CandidatoPerfil";
 import PorMunicipio from "./pages/PorMunicipio";
 import PorPartido from "./pages/PorPartido";
@@ -24,7 +25,7 @@ const queryClient = new QueryClient();
 
 function Layout() {
   const location = useLocation();
-  const hideFilters = ['/importar', '/ajuda', '/consulta', '/explorador'].includes(location.pathname);
+  const hideFilters = ['/importar', '/ajuda', '/consulta', '/explorador', '/chat'].includes(location.pathname);
 
   return (
     <SidebarProvider>
@@ -45,6 +46,7 @@ function Layout() {
               <Route path="/ranking" element={<Ranking />} />
               <Route path="/explorador" element={<Explorador />} />
               <Route path="/consulta" element={<ConsultaIA />} />
+              <Route path="/chat" element={<ChatEleicoes />} />
               <Route path="/candidatos" element={<Ranking />} />
               <Route path="/candidato/:id" element={<CandidatoPerfil />} />
               <Route path="/municipio" element={<PorMunicipio />} />
