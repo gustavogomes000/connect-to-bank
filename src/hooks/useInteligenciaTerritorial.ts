@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { mdQuery, MD, COL } from '@/lib/motherduck';
+import { mdQuery, MD, COL, CAND_ANOS } from '@/lib/motherduck';
 
 // KPIs por cidade
 export function useCidadeKPIs(municipio: string, ano: number | null) {
@@ -13,7 +13,7 @@ export function useCidadeKPIs(municipio: string, ano: number | null) {
           count(CASE WHEN ${COL.genero} = 'FEMININO' THEN 1 END) as mulheres,
           count(DISTINCT ${COL.partido}) as partidos,
           count(DISTINCT ${COL.cargo}) as cargos
-        FROM ${MD.candidatos} WHERE ${COL.municipio} = '${municipio}' ${anoFilter}`
+        FROM ${MD.candidatos(ano)} WHERE ${COL.municipio} = '${municipio}' ${anoFilter}`
       );
       const anoVal = ano || 2024;
       let comp = { apto: 0, comp: 0, abst: 0, brancos: 0, nulos: 0 };
@@ -152,7 +152,7 @@ export function useComparativoCidades(ano: number | null) {
             count(CASE WHEN ${COL.situacaoFinal} ILIKE '%ELEITO%' AND ${COL.situacaoFinal} NOT ILIKE '%NÃO ELEITO%' THEN 1 END) as eleitos,
             count(CASE WHEN ${COL.genero} = 'FEMININO' THEN 1 END) as mulheres,
             count(DISTINCT ${COL.partido}) as partidos
-          FROM ${MD.candidatos} WHERE ${COL.municipio} = '${cidade}' ${anoFilter}`
+          FROM ${MD.candidatos(anoVal)} WHERE ${COL.municipio} = '${cidade}' ${anoFilter}`
         );
         let comp = { eleitorado: 0, comparecimento: 0, abstencoes: 0 };
         try {
@@ -180,10 +180,10 @@ export function useCandidatosCidadePatrimonio(municipio: string, ano: number | n
       return mdQuery(
         `SELECT c.${COL.sequencial} as id, c.${COL.nomeUrna} as nome_urna, c.${COL.partido} as sigla_partido,
           c.${COL.cargo} as cargo, c.${COL.situacaoFinal} as situacao_final, c.${COL.genero} as genero,
-          c.${COL.numero} as numero_urna, COALESCE(sum(b.${COL.valorBem}), 0) as patrimonio
-        FROM ${MD.candidatos} c
-        LEFT JOIN ${MD.bens} b ON c.${COL.sequencial} = b.${COL.sequencial} AND c.${COL.ano} = b.${COL.ano}
-        WHERE c.${COL.municipio} = '${municipio}' AND c.${COL.ano} = ${anoVal}
+          c.${COL.numero} as numero_urna, COALESCE(sum(${COL.valorBemNum}), 0) as patrimonio
+        FROM ${MD.candidatos(anoVal)} c
+        LEFT JOIN ${MD.bens(anoVal)} b ON c.${COL.sequencial} = b.${COL.sequencial}
+        WHERE c.${COL.municipio} = '${municipio}'
         GROUP BY c.${COL.sequencial}, c.${COL.nomeUrna}, c.${COL.partido}, c.${COL.cargo},
           c.${COL.situacaoFinal}, c.${COL.genero}, c.${COL.numero}
         ORDER BY patrimonio DESC LIMIT 200`
@@ -198,12 +198,11 @@ export function usePartidosCidade(municipio: string, ano: number | null) {
     queryKey: ['partidosCidade', municipio, ano],
     queryFn: async () => {
       const anoVal = ano || 2024;
-      const anoFilter = `AND ${COL.ano} = ${anoVal}`;
       return mdQuery(
         `SELECT ${COL.partido} as partido, count(*) as candidatos,
           count(CASE WHEN ${COL.situacaoFinal} ILIKE '%ELEITO%' AND ${COL.situacaoFinal} NOT ILIKE '%NÃO ELEITO%' THEN 1 END) as eleitos,
           count(CASE WHEN ${COL.genero} = 'FEMININO' THEN 1 END) as mulheres
-        FROM ${MD.candidatos} WHERE ${COL.municipio} = '${municipio}' ${anoFilter}
+        FROM ${MD.candidatos(anoVal)} WHERE ${COL.municipio} = '${municipio}'
         GROUP BY ${COL.partido} ORDER BY candidatos DESC`
       ).then(rows => rows.map((r: any) => ({
         partido: r.partido, candidatos: Number(r.candidatos), votos: 0,
