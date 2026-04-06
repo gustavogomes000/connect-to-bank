@@ -1,8 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
 import {
   BarChart3, Trophy, Building2, Target, MapPin, DollarSign, UserCheck,
-  HelpCircle, TrendingUp, Sparkles, MessageSquare, Settings,
-  Vote, CheckCircle, Users, School,
+  HelpCircle, TrendingUp, Sparkles, MessageSquare, Settings, Crosshair,
 } from 'lucide-react';
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -10,26 +9,24 @@ import {
 } from '@/components/ui/sidebar';
 import { cn } from '@/lib/utils';
 
-const consultaItems = [
+const analysisItems = [
   { title: 'Consulta IA', url: '/consulta', icon: Sparkles },
   { title: 'Chat Eleições', url: '/chat', icon: MessageSquare },
+  { title: 'Goiânia & Aparecida', url: '/territorial', icon: Crosshair },
   { title: 'Explorador', url: '/explorador', icon: TrendingUp },
+  { title: 'Dashboard', url: '/', icon: BarChart3 },
+  { title: 'Ranking', url: '/ranking', icon: Trophy },
 ];
 
-const dataItems = [
-  { title: 'Candidatos', url: '/ranking', icon: Users },
-  { title: 'Eleitos', url: '/eleitos', icon: CheckCircle },
-  { title: 'Votação', url: '/votacao', icon: Trophy },
-  { title: 'Comparecimento', url: '/comparecimento', icon: Vote },
-  { title: 'Partidos', url: '/partido', icon: Target },
+const dimensionItems = [
   { title: 'Municípios', url: '/municipio', icon: Building2 },
+  { title: 'Partidos', url: '/partido', icon: Target },
   { title: 'Bairros', url: '/bairro', icon: MapPin },
   { title: 'Patrimônio', url: '/patrimonio', icon: DollarSign },
   { title: 'Perfil', url: '/perfil-candidatos', icon: UserCheck },
 ];
 
 const systemItems = [
-  { title: 'Dashboard', url: '/', icon: BarChart3 },
   { title: 'Configurações', url: '/config', icon: Settings },
   { title: 'Ajuda', url: '/ajuda', icon: HelpCircle },
 ];
@@ -39,7 +36,7 @@ export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === 'collapsed';
 
-  const MenuItem = ({ item }: { item: typeof consultaItems[0] }) => {
+  const MenuItem = ({ item }: { item: typeof analysisItems[0] }) => {
     const isActive = location.pathname === item.url;
     return (
       <SidebarMenuItem>
@@ -78,15 +75,15 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className="px-2 py-3">
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-[10px] text-sidebar-foreground/30 uppercase tracking-widest px-3 mb-1">Inteligência</SidebarGroupLabel>}
+          {!collapsed && <SidebarGroupLabel className="text-[10px] text-sidebar-foreground/30 uppercase tracking-widest px-3 mb-1">Análise</SidebarGroupLabel>}
           <SidebarGroupContent>
-            <SidebarMenu>{consultaItems.map(item => <MenuItem key={item.url} item={item} />)}</SidebarMenu>
+            <SidebarMenu>{analysisItems.map(item => <MenuItem key={item.url} item={item} />)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-[10px] text-sidebar-foreground/30 uppercase tracking-widest px-3 mb-1 mt-4">Dados</SidebarGroupLabel>}
+          {!collapsed && <SidebarGroupLabel className="text-[10px] text-sidebar-foreground/30 uppercase tracking-widest px-3 mb-1 mt-4">Dimensões</SidebarGroupLabel>}
           <SidebarGroupContent>
-            <SidebarMenu>{dataItems.map(item => <MenuItem key={item.url} item={item} />)}</SidebarMenu>
+            <SidebarMenu>{dimensionItems.map(item => <MenuItem key={item.url} item={item} />)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
