@@ -126,7 +126,7 @@ function ChartRenderer({ resultado }: { resultado: ConsultaResultado }) {
     return (
       <ResponsiveContainer width="100%" height={380}>
         <BarChart data={chartData}>
-          <XAxis dataKey={labelCol} tick={{ fontSize: 10, angle: -30 }} height={60} />
+          <XAxis dataKey={labelCol} tick={{ fontSize: 10 }} />
           <YAxis tick={{ fontSize: 10 }} />
           <Tooltip formatter={(v: number) => formatNumber(v)} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
