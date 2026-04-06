@@ -10,8 +10,8 @@
 --   🗑️ DROP: tabelas vazias
 --
 -- CÓDIGOS TSE:
---   Goiânia     = 93734  (ou NM_MUNICIPIO = 'GOIÂNIA')
---   Aparecida   = 91758  (ou NM_MUNICIPIO = 'APARECIDA DE GOIÂNIA')
+--   Goiânia     = 93734  (ou nome_municipio = 'GOIÂNIA')
+--   Aparecida   = 91758  (ou nome_municipio = 'APARECIDA DE GOIÂNIA')
 --
 -- ⚠️  EXECUTE BLOCO A BLOCO, NÃO TUDO DE UMA VEZ
 -- ============================================================
@@ -41,7 +41,7 @@ ORDER BY table_name;
 
 
 -- ============================================================
--- PARTE 2: FILTRAR GYN+APA — TABELAS COM CD_MUNICIPIO
+-- PARTE 2: FILTRAR GYN+APA — TABELAS COM codigo_municipio
 -- ============================================================
 -- Padrão: CREATE OR REPLACE (comprime + filtra de uma vez)
 -- A coluna de município varia por tipo de arquivo TSE.
@@ -49,8 +49,8 @@ ORDER BY table_name;
 
 -- ────────────────────────────────────────────────────────────
 -- 2A. BENS DE CANDIDATOS → GYN+APA
--- Coluna provável: CD_MUNICIPIO_NASCIMENTO ou SQ_CANDIDATO (join com candidatos)
--- Como bens não tem CD_MUNICIPIO direto, filtrar via JOIN com candidatos:
+-- Coluna provável: codigo_municipio_NASCIMENTO ou sequencial_candidato (join com candidatos)
+-- Como bens não tem codigo_municipio direto, filtrar via JOIN com candidatos:
 -- ────────────────────────────────────────────────────────────
 
 -- BENS ESTADUAIS (2014, 2018, 2022) → GO inteiro (candidatos concorrem no estado todo)
@@ -62,72 +62,72 @@ CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2022`
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2016` AS
 SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2016` b
 JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2016` c
-  ON b.SQ_CANDIDATO = c.SQ_CANDIDATO
-WHERE c.CD_MUNICIPIO IN ('93734', '91758');
+  ON b.sequencial_candidato = c.sequencial_candidato
+WHERE c.codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2020` AS
 SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2020` b
 JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2020` c
-  ON b.SQ_CANDIDATO = c.SQ_CANDIDATO
-WHERE c.CD_MUNICIPIO IN ('93734', '91758');
+  ON b.sequencial_candidato = c.sequencial_candidato
+WHERE c.codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2024` AS
 SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2024` b
 JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2024` c
-  ON b.SQ_CANDIDATO = c.SQ_CANDIDATO
-WHERE c.CD_MUNICIPIO IN ('93734', '91758');
+  ON b.sequencial_candidato = c.sequencial_candidato
+WHERE c.codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
 -- 2B. VOTAÇÃO POR SEÇÃO → GYN+APA
--- Coluna: CD_MUNICIPIO
+-- Coluna: codigo_municipio
 -- ────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2016` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2016`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2018` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2018`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2022`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
 -- 2C. COMPARECIMENTO MUNZONA → GYN+APA
--- Coluna: CD_MUNICIPIO
+-- Coluna: codigo_municipio
 -- ────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2016` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2016`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2018` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2018`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2022`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
@@ -136,79 +136,79 @@ WHERE CD_MUNICIPIO IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2022`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
 -- 2E. BOLETIM DE URNA → GYN+APA
--- Coluna: CD_MUNICIPIO
+-- Coluna: codigo_municipio
 -- ────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2018_t1` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2018_t1`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2018_t2` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2018_t2`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2020_t1` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2020_t1`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2020_t2` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2020_t2`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2022_t1` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2022_t1`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2022_t2` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2022_t2`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2024_t1` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2024_t1`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2024_t2` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2024_t2`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
 -- 2F. PERFIL DO ELEITORADO → GYN+APA
--- Coluna: CD_MUNICIPIO
+-- Coluna: codigo_municipio
 -- ────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2016` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2016`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2018` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2018`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2022`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
@@ -217,15 +217,15 @@ WHERE CD_MUNICIPIO IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2022`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
@@ -234,21 +234,21 @@ WHERE CD_MUNICIPIO IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2022`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
 -- 2I. RECEITAS → GYN+APA
--- Coluna provável: CD_MUNICIPIO ou SQ_CANDIDATO (join)
--- Receitas podem ter CD_MUNICIPIO direto no TSE
+-- Coluna provável: codigo_municipio ou sequencial_candidato (join)
+-- Receitas podem ter codigo_municipio direto no TSE
 -- ────────────────────────────────────────────────────────────
 
 -- RECEITAS ESTADUAIS (2018, 2022) → GO inteiro
@@ -258,18 +258,18 @@ CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2022` AS SEL
 -- RECEITAS MUNICIPAIS (2016, 2020, 2024) → GYN+APA
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2016` AS
 SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2016` r
-WHERE r.CD_MUNICIPIO IN ('93734', '91758')
-   OR r.SG_UE IN ('93734', '91758');
+WHERE r.codigo_municipio IN ('93734', '91758')
+   OR r.sigla_ue IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2020` AS
 SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2020` r
-WHERE r.CD_MUNICIPIO IN ('93734', '91758')
-   OR r.SG_UE IN ('93734', '91758');
+WHERE r.codigo_municipio IN ('93734', '91758')
+   OR r.sigla_ue IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2024` AS
 SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2024` r
-WHERE r.CD_MUNICIPIO IN ('93734', '91758')
-   OR r.SG_UE IN ('93734', '91758');
+WHERE r.codigo_municipio IN ('93734', '91758')
+   OR r.sigla_ue IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
@@ -283,32 +283,32 @@ CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2022` AS SEL
 -- DESPESAS MUNICIPAIS (2016, 2020, 2024) → GYN+APA
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2016` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2016`
-WHERE CD_MUNICIPIO IN ('93734', '91758')
-   OR SG_UE IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758')
+   OR sigla_ue IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758')
-   OR SG_UE IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758')
+   OR sigla_ue IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758')
-   OR SG_UE IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758')
+   OR sigla_ue IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
 -- 2K. LEGENDAS → GYN+APA
--- Coluna: SG_UE (código da unidade eleitoral)
+-- Coluna: sigla_ue (código da unidade eleitoral)
 -- ────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_legendas_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_legendas_2022`
-WHERE SG_UE IN ('93734', '91758') OR CD_MUNICIPIO IN ('93734', '91758');
+WHERE sigla_ue IN ('93734', '91758') OR codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_legendas_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_legendas_2024`
-WHERE SG_UE IN ('93734', '91758') OR CD_MUNICIPIO IN ('93734', '91758');
+WHERE sigla_ue IN ('93734', '91758') OR codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
@@ -322,19 +322,19 @@ CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2022` A
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2024` AS
 SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2024` r
 JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2024` c
-  ON r.SQ_CANDIDATO = c.SQ_CANDIDATO
-WHERE c.CD_MUNICIPIO IN ('93734', '91758');
+  ON r.sequencial_candidato = c.sequencial_candidato
+WHERE c.codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
 -- 2M. FILIADOS → GYN+APA
--- Coluna provável: NM_MUNICIPIO ou CD_MUNICIPIO
+-- Coluna provável: nome_municipio ou codigo_municipio
 -- ────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_filiados_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_filiados_2024`
-WHERE UPPER(NM_MUNICIPIO) IN ('GOIÂNIA', 'GOIANIA', 'APARECIDA DE GOIÂNIA', 'APARECIDA DE GOIANIA')
-   OR CD_MUNICIPIO IN ('93734', '91758');
+WHERE UPPER(nome_municipio) IN ('GOIÂNIA', 'GOIANIA', 'APARECIDA DE GOIÂNIA', 'APARECIDA DE GOIANIA')
+   OR codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
@@ -343,15 +343,15 @@ WHERE UPPER(NM_MUNICIPIO) IN ('GOIÂNIA', 'GOIANIA', 'APARECIDA DE GOIÂNIA', 'A
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2022`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758');
 
 
 -- ────────────────────────────────────────────────────────────
@@ -360,18 +360,18 @@ WHERE CD_MUNICIPIO IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2020` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2020`
-WHERE CD_MUNICIPIO IN ('93734', '91758')
-   OR SG_UE IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758')
+   OR sigla_ue IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2022` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2022`
-WHERE CD_MUNICIPIO IN ('93734', '91758')
-   OR SG_UE IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758')
+   OR sigla_ue IN ('93734', '91758');
 
 CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2024` AS
 SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2024`
-WHERE CD_MUNICIPIO IN ('93734', '91758')
-   OR SG_UE IN ('93734', '91758');
+WHERE codigo_municipio IN ('93734', '91758')
+   OR sigla_ue IN ('93734', '91758');
 
 
 -- ============================================================
