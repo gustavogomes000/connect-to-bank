@@ -222,7 +222,7 @@ function buildQuery(intent: Intent, e: Entities): QueryPlan {
     case "ranking_patrimonio": {
       return {
         sql: `SELECT c.nm_urna_candidato AS candidato, c.sg_partido AS partido,
-          sum(CAST(b.vr_bem_candidato AS DOUBLE)) AS patrimonio_total, count(*) AS qtd_bens
+          sum(CAST(REPLACE(b.vr_bem_candidato, ',', '.') AS DOUBLE)) AS patrimonio_total, count(*) AS qtd_bens
           FROM ${bensTable(ano)} b
           JOIN ${candTable(ano)} c ON b.sq_candidato = c.sq_candidato
           ${e.municipios.length ? `WHERE c.nm_ue = '${e.municipios[0]}'` : ''}
@@ -235,7 +235,7 @@ function buildQuery(intent: Intent, e: Entities): QueryPlan {
     case "patrimonio_candidato": {
       if (e.nomes.length > 0) {
         return {
-          sql: `SELECT ds_tipo_bem_candidato AS tipo, ds_bem_candidato AS descricao, CAST(vr_bem_candidato AS DOUBLE) AS valor
+          sql: `SELECT ds_tipo_bem_candidato AS tipo, ds_bem_candidato AS descricao, CAST(REPLACE(vr_bem_candidato, ',', '.') AS DOUBLE) AS valor
             FROM ${bensTable(ano)} WHERE UPPER(nm_candidato) ILIKE '%${e.nomes[0]}%' OR sq_candidato IN (
               SELECT sq_candidato FROM ${candTable(ano)} WHERE nm_urna_candidato ILIKE '%${e.nomes[0]}%'
             ) ORDER BY valor DESC LIMIT 50`,
@@ -332,17 +332,21 @@ function buildQuery(intent: Intent, e: Entities): QueryPlan {
     }
     case "distribuicao_idade": {
       const w = buildMDWhere(e, '');
-      const wc = w ? `WHERE ${w} AND nr_idade_data_posse > 0` : 'WHERE nr_idade_data_posse > 0';
+      const wc = w ? `WHERE ${w} AND dt_nascimento IS NOT NULL AND dt_nascimento != ''` : "WHERE dt_nascimento IS NOT NULL AND dt_nascimento != ''";
       return {
         sql: `SELECT CASE
-          WHEN nr_idade_data_posse <= 25 THEN '18-25'
-          WHEN nr_idade_data_posse <= 35 THEN '26-35'
-          WHEN nr_idade_data_posse <= 45 THEN '36-45'
-          WHEN nr_idade_data_posse <= 55 THEN '46-55'
-          WHEN nr_idade_data_posse <= 65 THEN '56-65'
+          WHEN age <= 25 THEN '18-25'
+          WHEN age <= 35 THEN '26-35'
+          WHEN age <= 45 THEN '36-45'
+          WHEN age <= 55 THEN '46-55'
+          WHEN age <= 65 THEN '56-65'
           ELSE '66+'
           END AS faixa, count(*) AS total
-          FROM ${candTable(ano)} ${wc} GROUP BY faixa ORDER BY faixa`,
+          FROM (
+            SELECT CAST(EXTRACT(YEAR FROM AGE(CURRENT_DATE, TRY_CAST(dt_nascimento AS DATE))) AS INT) as age
+            FROM ${candTable(ano)} ${wc}
+          ) sub WHERE age BETWEEN 18 AND 120
+          GROUP BY faixa ORDER BY faixa`,
         tipo_grafico: "bar",
         titulo: `Faixa etária dos candidatos — ${anoLabel}`,
         descricao: `Distribuição por idade`,
@@ -517,7 +521,7 @@ Deno.serve(async (req) => {
             body: JSON.stringify({
               model: "google/gemini-2.5-flash",
               messages: [
-                { role: "system", content: `Gere SQL DuckDB para MotherDuck. Tabelas: my_db.candidatos_YYYY_GO (colunas: ano_eleicao, nm_candidato, nm_urna_candidato, sg_partido, ds_cargo, nm_ue, ds_genero, ds_grau_instrucao, ds_ocupacao, ds_sit_tot_turno, sq_candidato, nr_candidato, dt_nascimento, nr_idade_data_posse), my_db.votacao_munzona_YYYY_GO (nm_municipio, nr_zona, nm_urna_candidato, sg_partido, ds_cargo, qt_votos_nominais), my_db.comparecimento_munzona_YYYY_GO (nm_municipio, nr_zona, qt_aptos, qt_comparecimento, qt_abstencoes, qt_votos_brancos, qt_votos_nulos), my_db.bens_candidatos_YYYY_GO (sq_candidato, ds_tipo_bem_candidato, vr_bem_candidato VARCHAR), my_db.comparecimento_abstencao_YYYY_GO (nm_municipio, nm_bairro, nm_local_votacao, qt_aptos, qt_comparecimento). Anos: 2012-2024. CAST vr_bem_candidato AS DOUBLE para somas. Use LIMIT 200. Responda APENAS JSON: {"sql":"...","tipo_grafico":"bar|pie|line|area|table|kpi","titulo":"...","descricao":"..."}. NUNCA invente dados. APENAS use tabelas listadas.` },
+                { role: "system", content: `Gere SQL DuckDB para MotherDuck. Tabelas: my_db.candidatos_YYYY_GO (colunas: ano_eleicao, nm_candidato, nm_urna_candidato, sg_partido, ds_cargo, nm_ue, ds_genero, ds_grau_instrucao, ds_ocupacao, ds_sit_tot_turno, sq_candidato, nr_candidato, dt_nascimento), my_db.votacao_munzona_YYYY_GO (nm_municipio, nr_zona, nm_urna_candidato, sg_partido, ds_cargo, qt_votos_nominais), my_db.comparecimento_munzona_YYYY_GO (nm_municipio, nr_zona, qt_aptos, qt_comparecimento, qt_abstencoes, qt_votos_brancos, qt_votos_nulos), my_db.bens_candidatos_YYYY_GO (sq_candidato, ds_tipo_bem_candidato, vr_bem_candidato VARCHAR com vírgula decimal), my_db.comparecimento_abstencao_YYYY_GO (nm_municipio, nm_bairro, nm_local_votacao, qt_aptos, qt_comparecimento). Anos: 2012-2024. IMPORTANTE: vr_bem_candidato usa vírgula como decimal (ex: '100000,00'), sempre use CAST(REPLACE(vr_bem_candidato, ',', '.') AS DOUBLE) para somas. NÃO existe coluna nr_idade_data_posse — calcule idade via dt_nascimento. Use LIMIT 200. Responda APENAS JSON: {"sql":"...","tipo_grafico":"bar|pie|line|area|table|kpi","titulo":"...","descricao":"..."}. NUNCA invente dados. APENAS use tabelas listadas.` },
                 { role: "user", content: pergunta },
               ],
               temperature: 0.1,
