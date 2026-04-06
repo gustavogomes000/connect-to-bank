@@ -371,9 +371,8 @@ export function usePatrimonioDistribuicao() {
 }
 
 // ═══ RANKING ═══
-export function useRanking(search: string, page: number, sortBy: string, sortAsc: boolean) {
+export function useRanking(search: string, page: number, sortBy: string, sortAsc: boolean, pageSize = 30) {
   const f = useFilters();
-  const pageSize = 20;
   return useQuery({
     queryKey: ['ranking', f, search, page, sortBy, sortAsc],
     queryFn: async () => {
@@ -720,6 +719,179 @@ export function useMunicipiosRanking() {
         map.set(m, cur);
       });
       return Array.from(map.entries()).map(([municipio, stats]) => ({ municipio, ...stats })).sort((a, b) => b.total - a.total);
+    },
+  });
+}
+
+// ═══ VOTOS BRANCOS/NULOS ═══
+export function useVotosBrancosNulos() {
+  const f = useFilters();
+  return useQuery({
+    queryKey: ['votosBrancosNulos', f],
+    queryFn: async () => {
+      let q = (supabase.from(TABELA_COMPARECIMENTO) as any).select('ano, votos_brancos, votos_nulos, comparecimento');
+      if (f.ano) q = q.eq('ano', f.ano);
+      if (f.municipio) q = q.eq('municipio', f.municipio);
+      const data = await fetchAll(q);
+      const map = new Map<number, { brancos: number; nulos: number; comp: number }>();
+      data.forEach((r: any) => {
+        const cur = map.get(r.ano) || { brancos: 0, nulos: 0, comp: 0 };
+        cur.brancos += r.votos_brancos || 0;
+        cur.nulos += r.votos_nulos || 0;
+        cur.comp += r.comparecimento || 0;
+        map.set(r.ano, cur);
+      });
+      return Array.from(map.entries()).map(([ano, v]) => ({
+        ano, brancos: v.brancos, nulos: v.nulos, comp: v.comp,
+        pctBrancos: v.comp > 0 ? (v.brancos / v.comp) * 100 : 0,
+        pctNulos: v.comp > 0 ? (v.nulos / v.comp) * 100 : 0,
+      })).sort((a, b) => a.ano - b.ano);
+    },
+  });
+}
+
+// ═══ TAXA DE REELEIÇÃO ═══
+export function useTaxaReeleicao() {
+  const f = useFilters();
+  return useQuery({
+    queryKey: ['taxaReeleicao', f],
+    queryFn: async () => {
+      const q = (supabase.from(TABELA_CANDIDATOS) as any).select('nome_urna, ano, situacao_final, cargo');
+      const data = await fetchAll(q);
+      // Group by name
+      const byName = new Map<string, any[]>();
+      data.forEach((r: any) => {
+        const n = r.nome_urna;
+        if (!n) return;
+        if (!byName.has(n)) byName.set(n, []);
+        byName.get(n)!.push(r);
+      });
+      let recandidatos = 0;
+      let reeleitos = 0;
+      byName.forEach((entries) => {
+        if (entries.length < 2) return;
+        const sorted = entries.sort((a: any, b: any) => a.ano - b.ano);
+        for (let i = 1; i < sorted.length; i++) {
+          const prev = (sorted[i-1].situacao_final || '').toUpperCase();
+          const curr = (sorted[i].situacao_final || '').toUpperCase();
+          if (prev.includes('ELEITO') && !prev.includes('NÃO')) {
+            recandidatos++;
+            if (curr.includes('ELEITO') && !curr.includes('NÃO')) reeleitos++;
+          }
+        }
+      });
+      return { recandidatos, reeleitos, taxa: recandidatos > 0 ? (reeleitos / recandidatos) * 100 : 0 };
+    },
+  });
+}
+
+// ═══ PATRIMÔNIO VS VOTOS (SCATTER) ═══
+export function usePatrimonioVsVotos() {
+  const f = useFilters();
+  return useQuery({
+    queryKey: ['patrimonioVsVotos', f],
+    queryFn: async () => {
+      const ano = f.ano || 2024;
+      const bensQ = (supabase.from(TABELA_BENS) as any).select('sequencial_candidato, valor_bem').eq('ano', ano);
+      const bens = await fetchAll(bensQ);
+      const patriMap = new Map<string, number>();
+      bens.forEach((b: any) => { const k = b.sequencial_candidato; if (!k) return; patriMap.set(k, (patriMap.get(k) || 0) + (b.valor_bem || 0)); });
+      if (patriMap.size === 0) return [];
+      const seqs = Array.from(patriMap.keys()).slice(0, 200);
+      const { data: cands } = await (supabase.from(TABELA_CANDIDATOS) as any).select('sequencial_candidato, nome_urna, sigla_partido').eq('ano', ano).in('sequencial_candidato', seqs);
+      const candMap = new Map<string, any>();
+      (cands || []).forEach((c: any) => candMap.set(c.sequencial_candidato, c));
+      const names = (cands || []).map((c: any) => c.nome_urna).filter(Boolean);
+      let votosMap = new Map<string, number>();
+      if (names.length > 0) {
+        try {
+          for (let i = 0; i < names.length; i += 100) {
+            const batch = names.slice(i, i + 100);
+            const { data: votos } = await (supabase.from(TABELA_VOTACAO) as any).select('nome_candidato, total_votos').eq('ano', ano).in('nome_candidato', batch);
+            (votos || []).forEach((v: any) => votosMap.set(v.nome_candidato, (votosMap.get(v.nome_candidato) || 0) + (v.total_votos || 0)));
+          }
+        } catch {}
+      }
+      return seqs.map(seq => {
+        const c = candMap.get(seq);
+        if (!c) return null;
+        const patrimonio = patriMap.get(seq) || 0;
+        const votos = votosMap.get(c.nome_urna) || 0;
+        if (patrimonio === 0 && votos === 0) return null;
+        return { nome: c.nome_urna, partido: c.sigla_partido, patrimonio, votos };
+      }).filter(Boolean);
+    },
+  });
+}
+
+// ═══ COMPARATIVO ENTRE ANOS ═══
+export function useComparativoAnos() {
+  return useQuery({
+    queryKey: ['comparativoAnos'],
+    queryFn: async () => {
+      const data = await fetchAll((supabase.from(TABELA_CANDIDATOS) as any).select('ano, genero, situacao_final, cargo'));
+      const map = new Map<number, { total: number; eleitos: number; mulheres: number; cargos: Set<string> }>();
+      data.forEach((r: any) => {
+        const cur = map.get(r.ano) || { total: 0, eleitos: 0, mulheres: 0, cargos: new Set<string>() };
+        cur.total++;
+        const s = (r.situacao_final || '').toUpperCase();
+        if (s.includes('ELEITO') && !s.includes('NÃO')) cur.eleitos++;
+        if ((r.genero || '').toUpperCase() === 'FEMININO') cur.mulheres++;
+        if (r.cargo) cur.cargos.add(r.cargo);
+        map.set(r.ano, cur);
+      });
+      return Array.from(map.entries()).map(([ano, v]) => ({
+        ano,
+        total: v.total,
+        eleitos: v.eleitos,
+        mulheres: v.mulheres,
+        pctMulheres: v.total > 0 ? Math.round((v.mulheres / v.total) * 100) : 0,
+        pctEleitos: v.total > 0 ? Math.round((v.eleitos / v.total) * 100) : 0,
+        cargos: v.cargos.size,
+      })).sort((a, b) => a.ano - b.ano);
+    },
+  });
+}
+
+// ═══ VOTAÇÃO POR ZONA ELEITORAL ═══
+export function useVotacaoPorZona(municipio?: string) {
+  const f = useFilters();
+  return useQuery({
+    queryKey: ['votacaoZona', municipio || f.municipio, f.ano],
+    queryFn: async () => {
+      const mun = municipio || f.municipio;
+      if (!mun) return [];
+      let q = (supabase.from(TABELA_COMPARECIMENTO) as any).select('zona, eleitorado_apto, comparecimento, abstencoes, votos_brancos, votos_nulos').eq('municipio', mun);
+      if (f.ano) q = q.eq('ano', f.ano);
+      const data = await fetchAll(q);
+      const map = new Map<number, { zona: number; apto: number; comp: number; abst: number; brancos: number; nulos: number }>();
+      data.forEach((r: any) => {
+        const z = r.zona || 0;
+        const cur = map.get(z) || { zona: z, apto: 0, comp: 0, abst: 0, brancos: 0, nulos: 0 };
+        cur.apto += r.eleitorado_apto || 0;
+        cur.comp += r.comparecimento || 0;
+        cur.abst += r.abstencoes || 0;
+        cur.brancos += r.votos_brancos || 0;
+        cur.nulos += r.votos_nulos || 0;
+        map.set(z, cur);
+      });
+      return Array.from(map.values()).sort((a, b) => a.zona - b.zona);
+    },
+    enabled: !!(municipio || f.municipio),
+  });
+}
+
+// ═══ NACIONALIDADE ═══
+export function useNacionalidade() {
+  const f = useFilters();
+  return useQuery({
+    queryKey: ['nacionalidade', f],
+    queryFn: async () => {
+      const q = applyFilters((supabase.from(TABELA_CANDIDATOS) as any).select('nacionalidade'), f);
+      const data = await fetchAll(q);
+      const map = new Map<string, number>();
+      data.forEach((r: any) => { const n = r.nacionalidade || 'NÃO INFORMADO'; map.set(n, (map.get(n) || 0) + 1); });
+      return Array.from(map.entries()).map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total);
     },
   });
 }
