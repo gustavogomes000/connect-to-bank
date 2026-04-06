@@ -236,23 +236,26 @@ export function useTopPatrimonio() {
   });
 }
 
-// ═══ FAIXA ETÁRIA ═══
+// ═══ FAIXA ETÁRIA ═══ (calculated from dt_nascimento)
 export function useFaixaEtaria() {
   const f = useFilters();
   return useQuery({
     queryKey: ['faixaEtaria', f],
     queryFn: async () => {
-      const w = buildWhere(f, 'nr_idade_data_posse > 0');
+      const w = buildWhere(f, `${COL.nascimento} IS NOT NULL AND ${COL.nascimento} != ''`);
       return mdQuery<{faixa: string; total: string}>(
         `SELECT CASE
-          WHEN nr_idade_data_posse <= 25 THEN '18-25'
-          WHEN nr_idade_data_posse <= 35 THEN '26-35'
-          WHEN nr_idade_data_posse <= 45 THEN '36-45'
-          WHEN nr_idade_data_posse <= 55 THEN '46-55'
-          WHEN nr_idade_data_posse <= 65 THEN '56-65'
+          WHEN age <= 25 THEN '18-25'
+          WHEN age <= 35 THEN '26-35'
+          WHEN age <= 45 THEN '36-45'
+          WHEN age <= 55 THEN '46-55'
+          WHEN age <= 65 THEN '56-65'
           ELSE '66+'
         END as faixa, count(*) as total
-        FROM ${candTable(f)} ${w}
+        FROM (
+          SELECT CAST(EXTRACT(YEAR FROM AGE(CURRENT_DATE, TRY_CAST(${COL.nascimento} AS DATE))) AS INT) as age
+          FROM ${candTable(f)} ${w}
+        ) sub WHERE age BETWEEN 18 AND 120
         GROUP BY faixa ORDER BY faixa`
       ).then(rows => rows.map(r => ({ faixa: r.faixa, total: Number(r.total) })));
     },
