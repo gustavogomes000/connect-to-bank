@@ -1,14 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-interface MotherDuckResult {
-  data: any;
-  isLoading: boolean;
-  error: Error | null;
+export interface MotherDuckResponse {
+  columns: { name: string; type: number }[];
+  rows: Record<string, any>[];
+  rowCount: number;
 }
 
-export function useMotherDuckQuery(sql: string, queryKey?: string[]): MotherDuckResult {
-  const result = useQuery({
+export function useMotherDuckQuery(sql: string, queryKey?: string[]) {
+  const result = useQuery<MotherDuckResponse>({
     queryKey: queryKey || ['motherduck', sql],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('query-motherduck', {
@@ -18,7 +18,7 @@ export function useMotherDuckQuery(sql: string, queryKey?: string[]): MotherDuck
       if (error) throw new Error(error.message || 'Erro ao chamar query-motherduck');
       if (data?.error) throw new Error(data.error);
 
-      return data;
+      return data as MotherDuckResponse;
     },
     retry: 1,
     staleTime: 5 * 60 * 1000,
