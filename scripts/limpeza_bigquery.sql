@@ -1,457 +1,418 @@
 -- ============================================================
--- 🧹 LIMPEZA BIGQUERY — eleicoes_go_clean
--- Gerado: 2026-04-06
--- 
--- RESUMO DAS DECISÕES:
---   ✅ GO inteiro: candidatos, votação munzona, votação partido, coligações, vagas, dados externos
---   🏙️ GYN+APA: bens, votação seção, comparecimento (munzona+seção), boletim urna,
---               perfil eleitorado, perfil eleitor seção, eleitorado local,
---               receitas, despesas, legendas, redes sociais, filiados, mesários, CNPJ campanha
---   🗑️ DROP: tabelas vazias
+-- 🧹 LIMPEZA BIGQUERY — silver-idea-389314.eleicoes_go_clean
+-- Gerado: 2026-04-06 (CORRIGIDO com tabelas e colunas reais)
 --
--- CÓDIGOS TSE:
---   Goiânia     = 93734  (ou nome_municipio = 'GOIÂNIA')
---   Aparecida   = 91758  (ou nome_municipio = 'APARECIDA DE GOIÂNIA')
+-- CÓDIGOS TSE (minúsculo):
+--   Goiânia     = cd_municipio = '93734'
+--   Aparecida   = cd_municipio = '91758'
+--
+-- REGRAS:
+--   Estadual (2014, 2018, 2022) → GO inteiro (candidatos concorrem no estado todo)
+--   Municipal (2012, 2016, 2020, 2024) → filtrar GYN+APA
+--   Tabelas granulares (seção, boletim) → sempre GYN+APA
 --
 -- ⚠️  EXECUTE BLOCO A BLOCO, NÃO TUDO DE UMA VEZ
 -- ============================================================
 
+
 -- ============================================================
--- PARTE 0: DESCOBRIR TABELAS VAZIAS PARA DROP
+-- PARTE 0: DIAGNÓSTICO — ver tamanho de cada tabela
 -- ============================================================
--- Execute primeiro para confirmar quais estão vazias:
+
+SELECT table_id, ROUND(size_bytes/1e6,1) AS mb, row_count
+FROM `silver-idea-389314.eleicoes_go_clean.__TABLES__`
+ORDER BY size_bytes DESC;
+
+
+-- ============================================================
+-- PARTE 1: TABELAS PARA VERIFICAR SE ESTÃO VAZIAS (possível DROP)
+-- ============================================================
+-- Rode o SELECT acima e confira row_count = 0 para estas:
+
+-- raw_cassacoes_2016, raw_cassacoes_2018, raw_cassacoes_2020
+-- raw_extrato_bancario_2014, raw_extrato_bancario_2018, raw_extrato_bancario_partido_2014
+-- raw_extrato_campanha_2016
+-- raw_cnpj_dir_partidario_2015
+-- raw_perfil_comp_deficiente_2014, 2016, 2018, 2020, 2024
+-- raw_perfil_comp_tte_2016
+-- raw_perfil_comparecimento_2014
+-- raw_prestacao_final_sup_2016
+-- raw_boletim_urna_1412_t2, raw_boletim_urna_1413_t1
+
+-- Se row_count = 0, rode:
 /*
-SELECT table_name, 
-       (SELECT COUNT(*) FROM `SEU_PROJETO.eleicoes_go_clean.` || table_name) as rows
-FROM `SEU_PROJETO.eleicoes_go_clean.INFORMATION_SCHEMA.TABLES`
-ORDER BY table_name;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_cassacoes_2016`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_cassacoes_2018`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_cassacoes_2020`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_extrato_bancario_2014`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_extrato_bancario_2018`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_extrato_bancario_partido_2014`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_extrato_campanha_2016`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_cnpj_dir_partidario_2015`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_perfil_comp_deficiente_2014`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_perfil_comp_deficiente_2016`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_perfil_comp_deficiente_2018`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_perfil_comp_deficiente_2020`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_perfil_comp_deficiente_2024`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_perfil_comp_tte_2016`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_perfil_comparecimento_2014`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_prestacao_final_sup_2016`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_1412_t2`;
+DROP TABLE IF EXISTS `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_1413_t1`;
 */
 
--- Script Python para listar vazias (mais prático):
--- python3 scripts/listar_vazias_bigquery.py --project SEU_PROJETO --dataset eleicoes_go_clean
+
+-- ============================================================
+-- PARTE 2: FILTRAR GYN+APA — tabelas grandes/médias
+-- ============================================================
+
+-- ── 2A. COMPARECIMENTO MUNZONA → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2016` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2016`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2018` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2018`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2020`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2022`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2B. COMPARECIMENTO SEÇÃO → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_secao_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_secao_2020`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_secao_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_secao_2022`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_secao_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_secao_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2C. BOLETIM DE URNA → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2018_t1` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2018_t1`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2018_t2` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2018_t2`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2020_t1` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2020_t1`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2020_t2` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2020_t2`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2022_t1` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2022_t1`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2022_t2` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2022_t2`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2024_t1` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2024_t1`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2024_t2` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_boletim_urna_2024_t2`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2D. VOTAÇÃO SEÇÃO → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_votacao_secao_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_votacao_secao_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2E. DETALHE VOTAÇÃO SEÇÃO → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2014` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2014`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2016` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2016`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2020`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2022`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_secao_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2F. PERFIL ELEITORADO → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitorado_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitorado_2020`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitorado_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitorado_2022`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitorado_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitorado_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2G. PERFIL ELEITOR SEÇÃO → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitor_secao_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitor_secao_2020`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitor_secao_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitor_secao_2022`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitor_secao_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_perfil_eleitor_secao_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2H. ELEITORADO LOCAL → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2014` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2014`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2016` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2016`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2018` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2018`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2020`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2022`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_eleitorado_local_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2I. MESÁRIOS → GYN+APA ──
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2016` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2016`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2018` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2018`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2020`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2022`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2016` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2016`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2018` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2018`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2020`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2022`
+WHERE cd_municipio IN ('93734', '91758');
+
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_mesarios_especiais_2024`
+WHERE cd_municipio IN ('93734', '91758');
+
+
+-- ── 2J. RECEITAS — estaduais GO inteiro, municipais GYN+APA ──
+
+-- 2018 estadual → GO inteiro (só comprimir)
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_receitas_2018` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_receitas_2018`;
+
+-- 2022 estadual → GO inteiro
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_receitas_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_receitas_2022`;
+
+-- 2020 municipal → GYN+APA
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_receitas_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_receitas_2020`
+WHERE cd_municipio IN ('93734', '91758') OR sg_ue IN ('93734', '91758');
+
+-- 2024 municipal → GYN+APA
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_receitas_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_receitas_2024`
+WHERE cd_municipio IN ('93734', '91758') OR sg_ue IN ('93734', '91758');
+
+
+-- ── 2K. DESPESAS — estaduais GO inteiro, municipais GYN+APA ──
+
+-- 2018 estadual → GO inteiro
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_despesas_2018` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_despesas_2018`;
+
+-- 2022 estadual → GO inteiro
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_despesas_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_despesas_2022`;
+
+-- 2020 municipal → GYN+APA
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_despesas_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_despesas_2020`
+WHERE cd_municipio IN ('93734', '91758') OR sg_ue IN ('93734', '91758');
+
+-- 2024 municipal → GYN+APA
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_despesas_2024` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_despesas_2024`
+WHERE cd_municipio IN ('93734', '91758') OR sg_ue IN ('93734', '91758');
+
+
+-- ── 2L. CNPJ CAMPANHA — estaduais GO, municipais GYN+APA ──
+
+-- 2014 estadual → GO inteiro
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_cnpj_campanha_2014` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_cnpj_campanha_2014`;
+
+-- 2022 estadual → GO inteiro
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_cnpj_campanha_2022` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_cnpj_campanha_2022`;
+
+-- 2016 municipal → GYN+APA
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_cnpj_campanha_2016` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_cnpj_campanha_2016`
+WHERE cd_municipio IN ('93734', '91758') OR sg_ue IN ('93734', '91758');
+
+-- 2020 municipal → GYN+APA
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_cnpj_campanha_2020` AS
+SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_cnpj_campanha_2020`
+WHERE cd_municipio IN ('93734', '91758') OR sg_ue IN ('93734', '91758');
 
 
 -- ============================================================
--- PARTE 1: DROP DE TABELAS VAZIAS
--- ============================================================
--- (Adicione aqui as tabelas confirmadas como vazias após rodar Parte 0)
--- Exemplos comuns de vazias:
--- DROP TABLE IF EXISTS `SEU_PROJETO.eleicoes_go_clean.raw_certidao_criminal_XXXX`;
--- DROP TABLE IF EXISTS `SEU_PROJETO.eleicoes_go_clean.raw_extrato_bancario_XXXX`;
-
-
--- ============================================================
--- PARTE 2: FILTRAR GYN+APA — TABELAS COM codigo_municipio
--- ============================================================
--- Padrão: CREATE OR REPLACE (comprime + filtra de uma vez)
--- A coluna de município varia por tipo de arquivo TSE.
--- Verifique com: SELECT * FROM tabela LIMIT 5
-
--- ────────────────────────────────────────────────────────────
--- 2A. BENS DE CANDIDATOS → GYN+APA
--- Coluna provável: codigo_municipio_NASCIMENTO ou sequencial_candidato (join com candidatos)
--- Como bens não tem codigo_municipio direto, filtrar via JOIN com candidatos:
--- ────────────────────────────────────────────────────────────
-
--- BENS ESTADUAIS (2014, 2018, 2022) → GO inteiro (candidatos concorrem no estado todo)
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2014` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2014`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2018`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2022`;
-
--- BENS MUNICIPAIS (2016, 2020, 2024) → GYN+APA
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2016` AS
-SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2016` b
-JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2016` c
-  ON b.sequencial_candidato = c.sequencial_candidato
-WHERE c.codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2020` AS
-SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2020` b
-JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2020` c
-  ON b.sequencial_candidato = c.sequencial_candidato
-WHERE c.codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2024` AS
-SELECT b.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_bens_candidatos_2024` b
-JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2024` c
-  ON b.sequencial_candidato = c.sequencial_candidato
-WHERE c.codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2B. VOTAÇÃO POR SEÇÃO → GYN+APA
--- Coluna: codigo_municipio
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2016` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2016`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2018` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2018`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2020`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2022`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2024`
-WHERE codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2C. COMPARECIMENTO MUNZONA → GYN+APA
--- Coluna: codigo_municipio
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2016` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2016`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2018` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2018`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2020`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2022`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2024`
-WHERE codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2D. COMPARECIMENTO SEÇÃO → GYN+APA
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2020`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2022`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_secao_2024`
-WHERE codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2E. BOLETIM DE URNA → GYN+APA
--- Coluna: codigo_municipio
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2018_t1` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2018_t1`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2018_t2` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2018_t2`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2020_t1` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2020_t1`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2020_t2` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2020_t2`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2022_t1` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2022_t1`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2022_t2` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2022_t2`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2024_t1` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2024_t1`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2024_t2` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_boletim_urna_2024_t2`
-WHERE codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2F. PERFIL DO ELEITORADO → GYN+APA
--- Coluna: codigo_municipio
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2016` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2016`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2018` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2018`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2020`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2022`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitorado_2024`
-WHERE codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2G. PERFIL ELEITOR SEÇÃO → GYN+APA
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2020`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2022`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_perfil_eleitor_secao_2024`
-WHERE codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2H. ELEITORADO LOCAL → GYN+APA
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2020`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2022`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_eleitorado_local_2024`
-WHERE codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2I. RECEITAS → GYN+APA
--- Coluna provável: codigo_municipio ou sequencial_candidato (join)
--- Receitas podem ter codigo_municipio direto no TSE
--- ────────────────────────────────────────────────────────────
-
--- RECEITAS ESTADUAIS (2018, 2022) → GO inteiro
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2018`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2022`;
-
--- RECEITAS MUNICIPAIS (2016, 2020, 2024) → GYN+APA
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2016` AS
-SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2016` r
-WHERE r.codigo_municipio IN ('93734', '91758')
-   OR r.sigla_ue IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2020` AS
-SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2020` r
-WHERE r.codigo_municipio IN ('93734', '91758')
-   OR r.sigla_ue IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2024` AS
-SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2024` r
-WHERE r.codigo_municipio IN ('93734', '91758')
-   OR r.sigla_ue IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2J. DESPESAS → GYN+APA
--- ────────────────────────────────────────────────────────────
-
--- DESPESAS ESTADUAIS (2018, 2022) → GO inteiro
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2018`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2022`;
-
--- DESPESAS MUNICIPAIS (2016, 2020, 2024) → GYN+APA
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2016` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2016`
-WHERE codigo_municipio IN ('93734', '91758')
-   OR sigla_ue IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2020`
-WHERE codigo_municipio IN ('93734', '91758')
-   OR sigla_ue IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_despesas_2024`
-WHERE codigo_municipio IN ('93734', '91758')
-   OR sigla_ue IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2K. LEGENDAS → GYN+APA
--- Coluna: sigla_ue (código da unidade eleitoral)
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_legendas_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_legendas_2022`
-WHERE sigla_ue IN ('93734', '91758') OR codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_legendas_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_legendas_2024`
-WHERE sigla_ue IN ('93734', '91758') OR codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2L. REDES SOCIAIS → GYN+APA (via JOIN candidatos)
--- ────────────────────────────────────────────────────────────
-
--- REDES SOCIAIS 2022 → GO inteiro (estadual)
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2022`;
-
--- REDES SOCIAIS 2024 → GYN+APA (municipal)
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2024` AS
-SELECT r.* FROM `SEU_PROJETO.eleicoes_go_clean.raw_redes_sociais_2024` r
-JOIN `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2024` c
-  ON r.sequencial_candidato = c.sequencial_candidato
-WHERE c.codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2M. FILIADOS → GYN+APA
--- Coluna provável: nome_municipio ou codigo_municipio
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_filiados_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_filiados_2024`
-WHERE UPPER(nome_municipio) IN ('GOIÂNIA', 'GOIANIA', 'APARECIDA DE GOIÂNIA', 'APARECIDA DE GOIANIA')
-   OR codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2N. MESÁRIOS → GYN+APA
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2020`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2022`
-WHERE codigo_municipio IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_mesarios_2024`
-WHERE codigo_municipio IN ('93734', '91758');
-
-
--- ────────────────────────────────────────────────────────────
--- 2O. CNPJ CAMPANHA → GYN+APA
--- ────────────────────────────────────────────────────────────
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2020` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2020`
-WHERE codigo_municipio IN ('93734', '91758')
-   OR sigla_ue IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2022` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2022`
-WHERE codigo_municipio IN ('93734', '91758')
-   OR sigla_ue IN ('93734', '91758');
-
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2024` AS
-SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_cnpj_campanha_2024`
-WHERE codigo_municipio IN ('93734', '91758')
-   OR sigla_ue IN ('93734', '91758');
-
-
--- ============================================================
--- PARTE 3: COMPRIMIR TABELAS QUE FICAM GO INTEIRO
--- (CREATE OR REPLACE sem WHERE = recompacta storage)
+-- PARTE 3: COMPRIMIR TABELAS GO INTEIRO (sem filtro)
 -- ============================================================
 
 -- Candidatos
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2012` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2012`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2014` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2014`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2016` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2016`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2018`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2020` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2020`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2022`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2024` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_2024`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_complementar_2020` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_complementar_2020`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_complementar_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_complementar_2022`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_complementar_2024` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_candidatos_complementar_2024`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_candidatos_2012` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_candidatos_2012`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_candidatos_complementar_2020` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_candidatos_complementar_2020`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_candidatos_complementar_2022` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_candidatos_complementar_2022`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_candidatos_complementar_2024` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_candidatos_complementar_2024`;
 
--- Votação munzona (GO inteiro)
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2012` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2012`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2014` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2014`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2016` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2016`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2018`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2020` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2020`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2022`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2024` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_munzona_2024`;
+-- Bens 2014 (estadual, único existente)
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_bens_candidatos_2014` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_bens_candidatos_2014`;
 
--- Votação partido (GO inteiro)
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2016` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2016`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2018`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2020` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2020`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2022`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2024` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_partido_munzona_2024`;
+-- Votação munzona
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_votacao_munzona_2012` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_votacao_munzona_2012`;
 
--- Coligações (GO inteiro)
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2016` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2016`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2018`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2020` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2020`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2022`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2024` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_coligacoes_2024`;
+-- Detalhe votação munzona (GO inteiro)
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2014` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2014`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2016` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2016`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2018` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2018`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2020` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2020`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2022` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_detalhe_votacao_munzona_2022`;
 
--- Vagas (GO inteiro)
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2016` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2016`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2018` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2018`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2020` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2020`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2022`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2024` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_vagas_2024`;
+-- Coligações
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_coligacoes_2014` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_coligacoes_2014`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_coligacoes_2016` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_coligacoes_2016`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_coligacoes_2018` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_coligacoes_2018`;
 
--- Dados externos (manter como estão, só comprimir)
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_municipio_tse_ibge` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_municipio_tse_ibge`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_datasus_nascimentos` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_datasus_nascimentos`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_datasus_obitos` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_datasus_obitos`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_datasus_mortalidade_infantil` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_datasus_mortalidade_infantil`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_siconfi_receitas` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_siconfi_receitas`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_siconfi_despesas` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_siconfi_despesas`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_fefc_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_fefc_2022`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_fefc_2024` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_fefc_2024`;
-CREATE OR REPLACE TABLE `SEU_PROJETO.eleicoes_go_clean.raw_censo_2022` AS SELECT * FROM `SEU_PROJETO.eleicoes_go_clean.raw_censo_2022`;
+-- Vagas
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_vagas_2014` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_vagas_2014`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_vagas_2016` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_vagas_2016`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_vagas_2018` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_vagas_2018`;
+
+-- Câmara deputados
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_camara_deputados_go` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_camara_deputados_go`;
+
+-- FEFC
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_fefc_fp_2020` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_fefc_fp_2020`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_fefc_fp_2022` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_fefc_fp_2022`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_fefc_fp_2024` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_fefc_fp_2024`;
+
+-- Dados externos (manter tudo, só comprimir)
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_municipio_tse_ibge` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_municipio_tse_ibge`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_censo_alfabetizacao` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_censo_alfabetizacao`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_censo_cor_raca` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_censo_cor_raca`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_censo_piramide_etaria` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_censo_piramide_etaria`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_censo_sexo` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_censo_sexo`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_datasus_estab_aparecida` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_datasus_estab_aparecida`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_datasus_estab_goiania` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_datasus_estab_goiania`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_datasus_estabelecimentos_aparecida` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_datasus_estabelecimentos_aparecida`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_datasus_estabelecimentos_goiania` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_datasus_estabelecimentos_goiania`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_alfabetizacao` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_alfabetizacao`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_cor_raca` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_cor_raca`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_pop` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_pop`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_saneamento` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_saneamento`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_sexo_idade` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_censo_sexo_idade`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_pib_impostos` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_pib_impostos`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_pib_percapita` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_pib_percapita`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_pib_total` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_pib_total`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_pib_va` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_pib_va`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_ibge_populacao_go` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_ibge_populacao_go`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_siconfi_rreo_aparecida` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_siconfi_rreo_aparecida`;
+CREATE OR REPLACE TABLE `silver-idea-389314.eleicoes_go_clean.raw_siconfi_rreo_goiania` AS SELECT * FROM `silver-idea-389314.eleicoes_go_clean.raw_siconfi_rreo_goiania`;
 
 
 -- ============================================================
 -- PARTE 4: VERIFICAÇÃO FINAL
 -- ============================================================
--- Execute para ver o tamanho total após limpeza:
-/*
-SELECT 
-  SUM(size_bytes) / (1024*1024*1024) AS total_gb,
-  COUNT(*) AS total_tabelas
-FROM `SEU_PROJETO.eleicoes_go_clean.__TABLES__`;
-*/
+
+SELECT table_id, ROUND(size_bytes/1e6,1) AS mb, row_count
+FROM `silver-idea-389314.eleicoes_go_clean.__TABLES__`
+ORDER BY size_bytes DESC;
 
 -- Verificar que GYN+APA têm dados:
 /*
-SELECT 'votacao_secao_2024' as tabela, COUNT(*) as linhas 
-FROM `SEU_PROJETO.eleicoes_go_clean.raw_votacao_secao_2024`
+SELECT 'comparecimento_2024' as tabela, COUNT(*) as linhas 
+FROM `silver-idea-389314.eleicoes_go_clean.raw_comparecimento_munzona_2024`
 UNION ALL
-SELECT 'comparecimento_munzona_2024', COUNT(*) 
-FROM `SEU_PROJETO.eleicoes_go_clean.raw_comparecimento_munzona_2024`
+SELECT 'votacao_secao_2024', COUNT(*) 
+FROM `silver-idea-389314.eleicoes_go_clean.raw_votacao_secao_2024`
 UNION ALL
 SELECT 'receitas_2024', COUNT(*) 
-FROM `SEU_PROJETO.eleicoes_go_clean.raw_receitas_2024`;
+FROM `silver-idea-389314.eleicoes_go_clean.raw_receitas_2024`;
 */
