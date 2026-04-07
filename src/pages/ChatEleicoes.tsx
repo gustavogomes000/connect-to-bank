@@ -48,15 +48,15 @@ function MessageBubble({ message, onSalvar, isSalvo }: { message: ChatMessage; o
               )}
             </div>
 
-            {message.resultado?.sucesso && message.resultado.dados?.length > 0 && (
+            {message.resultado?.sucesso && message.resultado.dados_brutos?.length > 0 && (
               <>
                 <div className="flex items-center gap-2 mt-3 mb-1">
                   <Badge variant="outline" className="text-[8px] h-5 border-primary/20 text-primary">
                     <BarChart3 className="w-2.5 h-2.5 mr-1" />
-                    {message.resultado.tipo_grafico}
+                    {message.resultado.config_visual.tipo_grafico}
                   </Badge>
                   <Badge variant="secondary" className="text-[8px] h-5">
-                    {message.resultado.dados.length} registros
+                    {message.resultado.dados_brutos.length} registros
                   </Badge>
                   {message.resultado.sql_gerado && (
                     <button onClick={() => setShowSQL(!showSQL)} className="text-[8px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
@@ -69,7 +69,11 @@ function MessageBubble({ message, onSalvar, isSalvo }: { message: ChatMessage; o
                     {message.resultado.sql_gerado}
                   </pre>
                 )}
-                <InlineChart resultado={message.resultado} />
+                <DynamicChart
+                  configVisual={message.resultado.config_visual}
+                  dadosBrutos={message.resultado.dados_brutos}
+                  colunas={message.resultado.colunas}
+                />
               </>
             )}
 
