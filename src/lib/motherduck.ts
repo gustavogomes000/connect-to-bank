@@ -440,6 +440,7 @@ export const MD = {
   despesasPagas: (ano?: number | null) => ano ? getTableName('despesas_pagas', ano) : _unionAll('despesas_pagas'),
   coligacoes: (ano?: number | null) => ano ? getTableName('coligacoes', ano) : _unionAll('coligacoes'),
   vagas: (ano?: number | null) => ano ? getTableName('vagas', ano) : _unionAll('vagas'),
+  comparecimentoSecao: (ano?: number | null) => ano ? getTableName('detalhe_secao', ano) : _unionAll('detalhe_secao'),
 } as const;
 
 function _unionAll(dataset: string): string {
