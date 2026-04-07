@@ -100,7 +100,7 @@ def executar_sql(sql):
     """Executa SQL no DuckDB CLI conectado ao MotherDuck."""
     result = subprocess.run(
         [str(DUCKDB_CLI), DATABASE, "-c", sql],
-        capture_output=True, text=True, timeout=600
+        capture_output=True, text=True, timeout=600, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
         return False, result.stderr
