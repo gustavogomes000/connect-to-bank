@@ -365,8 +365,8 @@ export default function ChatEleicoes() {
             <MessageSquare className="w-5 h-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-base font-bold text-foreground tracking-tight">Consulta por IA</h1>
-            <p className="text-[10px] text-muted-foreground">Pergunte sobre dados eleitorais de Goiás</p>
+            <h1 className="text-base font-bold text-foreground tracking-tight">Relatórios Personalizados</h1>
+            <p className="text-[10px] text-muted-foreground">Gere visualizações e gráficos sobre dados eleitorais de Goiás</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
@@ -404,9 +404,9 @@ export default function ChatEleicoes() {
             <div className="w-16 h-16 rounded-2xl bg-primary/8 border border-primary/15 flex items-center justify-center mb-4">
               <Database className="w-8 h-8 text-primary/50" />
             </div>
-            <h2 className="text-lg font-semibold text-foreground mb-1 tracking-tight">Consulta por IA</h2>
+            <h2 className="text-lg font-semibold text-foreground mb-1 tracking-tight">Relatórios Personalizados</h2>
             <p className="text-xs text-muted-foreground max-w-md mb-6">
-              Pergunte sobre candidatos, votos, partidos, comparecimento, patrimônio e outros dados eleitorais de Goiás.
+              Gere relatórios com gráficos, tabelas e visualizações sobre candidatos, votos, partidos e mais.
             </p>
 
             {favoritos.length > 0 && (
