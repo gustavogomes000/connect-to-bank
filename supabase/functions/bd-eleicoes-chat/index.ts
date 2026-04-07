@@ -214,8 +214,9 @@ function buildQuery(intent: Intent, e: Entities): QueryPlan | null {
 
   switch (intent) {
     case "ranking_votos": {
-      const w = buildWhere(e, true);
-      return { sql: `SELECT nm_urna_candidato AS candidato, sg_partido AS partido, sum(qt_votos_nominais) AS total_votos FROM ${votTable(ano)} ${w} GROUP BY nm_urna_candidato, sg_partido ORDER BY total_votos DESC LIMIT ${e.limite}`, tipo_grafico: "bar", titulo: `Top ${e.limite} mais votados — ${lbl} ${ano}`, descricao: `Ranking por votos` };
+      const mCond = e.municipios.length ? `WHERE nm_municipio='${mun}'` : '';
+      const cCond = e.cargos.length ? `${mCond ? ' AND' : ' WHERE'} ds_cargo ILIKE '%${e.cargos[0]}%'` : '';
+      return { sql: `SELECT sg_partido AS partido, nm_partido AS nome_partido, sum(qt_votos_nominais) AS votos_nominais, sum(qt_votos_legenda) AS votos_legenda FROM ${votPartTable(ano)} ${mCond}${cCond} GROUP BY sg_partido,nm_partido ORDER BY votos_nominais DESC LIMIT ${e.limite}`, tipo_grafico: "bar", titulo: `Top ${e.limite} partidos — ${lbl} ${ano}`, descricao: `Ranking por votos nominais` };
     }
     case "ranking_patrimonio":
       return { sql: `SELECT c.nm_urna_candidato AS candidato, c.sg_partido AS partido, sum(CAST(REPLACE(b.vr_bem_candidato,',','.')AS DOUBLE)) AS patrimonio FROM ${bensTable(ano)} b JOIN ${candTable(ano)} c ON b.sq_candidato=c.sq_candidato ${e.municipios.length?`WHERE c.nm_ue='${mun}'`:''} GROUP BY c.nm_urna_candidato,c.sg_partido ORDER BY patrimonio DESC LIMIT ${e.limite}`, tipo_grafico: "bar", titulo: `Maior patrimônio — ${ano}`, descricao: `Patrimônio declarado` };
@@ -254,8 +255,8 @@ function buildQuery(intent: Intent, e: Entities): QueryPlan | null {
     }
     case "distribuicao_idade": {
       const w = buildWhere(e);
-      const wc = w ? `${w} AND dt_nascimento IS NOT NULL` : "WHERE dt_nascimento IS NOT NULL";
-      return { sql: `SELECT CASE WHEN age<=25 THEN '18-25' WHEN age<=35 THEN '26-35' WHEN age<=45 THEN '36-45' WHEN age<=55 THEN '46-55' WHEN age<=65 THEN '56-65' ELSE '66+' END AS faixa, count(*) AS total FROM (SELECT CAST(EXTRACT(YEAR FROM AGE(CURRENT_DATE,TRY_CAST(dt_nascimento AS DATE)))AS INT) as age FROM ${candTable(ano)} ${wc}) sub WHERE age BETWEEN 18 AND 120 GROUP BY faixa ORDER BY faixa`, tipo_grafico: "bar", titulo: `Faixa etária — ${ano}`, descricao: `Distribuição` };
+      const wc = w ? `${w} AND dt_nascimento IS NOT NULL AND dt_nascimento != ''` : "WHERE dt_nascimento IS NOT NULL AND dt_nascimento != ''";
+      return { sql: `SELECT CASE WHEN age<=25 THEN '18-25' WHEN age<=35 THEN '26-35' WHEN age<=45 THEN '36-45' WHEN age<=55 THEN '46-55' WHEN age<=65 THEN '56-65' ELSE '66+' END AS faixa, count(*) AS total FROM (SELECT CAST(EXTRACT(YEAR FROM AGE(CURRENT_DATE,TRY_CAST(dt_nascimento AS DATE)))AS INT) as age FROM ${candTable(ano)} ${wc} AND TRY_CAST(dt_nascimento AS DATE) IS NOT NULL) sub WHERE age BETWEEN 18 AND 120 GROUP BY faixa ORDER BY faixa`, tipo_grafico: "bar", titulo: `Faixa etária — ${ano}`, descricao: `Distribuição` };
     }
     case "bairro_comparecimento":
       return { sql: `SELECT nm_bairro AS bairro, count(DISTINCT nr_local_votacao) AS locais, sum(qt_eleitor_secao) AS eleitores FROM ${eleitLocalTable(ano)} WHERE nm_municipio='${mun}' AND nm_bairro IS NOT NULL AND nm_bairro!='' GROUP BY nm_bairro ORDER BY eleitores DESC LIMIT 30`, tipo_grafico: "bar", titulo: `Bairros — ${mun} ${ano}`, descricao: `Eleitores por bairro` };

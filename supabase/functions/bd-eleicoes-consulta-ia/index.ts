@@ -280,10 +280,13 @@ function buildSQL(intent: Intent, e: Entities): string {
   const mun = e.municipios[0] || 'GOIÂNIA';
 
   switch (intent) {
-    case "ranking_votos": {
-      const w = buildWhere(e, true);
-      return `SELECT nm_urna_candidato AS candidato, sg_partido AS partido, sum(qt_votos_nominais) AS total_votos
-        FROM ${votTable(ano)} ${w} GROUP BY nm_urna_candidato, sg_partido ORDER BY total_votos DESC LIMIT ${e.limite}`;
+    case "ranking_votos":
+    case "total_votos": {
+      // votacao_munzona has incomplete candidate data — use party ranking instead
+      const mCond = e.municipios.length ? `WHERE nm_municipio = '${mun}'` : '';
+      const cCond = e.cargos.length ? `${mCond ? ' AND' : ' WHERE'} ds_cargo ILIKE '%${e.cargos[0]}%'` : '';
+      return `SELECT sg_partido AS partido, nm_partido AS nome_partido, sum(qt_votos_nominais) AS votos_nominais, sum(qt_votos_legenda) AS votos_legenda
+        FROM ${votPartTable(ano)} ${mCond}${cCond} GROUP BY sg_partido, nm_partido ORDER BY votos_nominais DESC LIMIT ${e.limite}`;
     }
     case "ranking_patrimonio":
       return `SELECT c.nm_urna_candidato AS candidato, c.sg_partido AS partido,
@@ -339,11 +342,11 @@ function buildSQL(intent: Intent, e: Entities): string {
     }
     case "distribuicao_idade": {
       const w = buildWhere(e);
-      const wc = w ? `${w} AND dt_nascimento IS NOT NULL` : "WHERE dt_nascimento IS NOT NULL";
+      const wc = w ? `${w} AND dt_nascimento IS NOT NULL AND dt_nascimento != ''` : "WHERE dt_nascimento IS NOT NULL AND dt_nascimento != ''";
       return `SELECT CASE WHEN age <= 25 THEN '18-25' WHEN age <= 35 THEN '26-35' WHEN age <= 45 THEN '36-45'
         WHEN age <= 55 THEN '46-55' WHEN age <= 65 THEN '56-65' ELSE '66+' END AS faixa, count(*) AS total
         FROM (SELECT CAST(EXTRACT(YEAR FROM AGE(CURRENT_DATE, TRY_CAST(dt_nascimento AS DATE))) AS INT) as age
-        FROM ${candTable(ano)} ${wc}) sub WHERE age BETWEEN 18 AND 120 GROUP BY faixa ORDER BY faixa`;
+        FROM ${candTable(ano)} ${wc} AND TRY_CAST(dt_nascimento AS DATE) IS NOT NULL) sub WHERE age BETWEEN 18 AND 120 GROUP BY faixa ORDER BY faixa`;
     }
     case "bairro_comparecimento":
       return `SELECT nm_bairro AS bairro, count(DISTINCT nr_local_votacao) AS locais, sum(qt_eleitor_secao) AS eleitores
@@ -448,11 +451,11 @@ Deno.serve(async (req) => {
 
     // ── STEP 2: Only call Gemini for "generico" or empty SQL ──
     if (!sql || intent === "generico") {
-      const sqlPrompt = `Gere SQL DuckDB para MotherDuck. Use APENAS as tabelas e colunas descritas.
-NUNCA invente colunas. Responda APENAS JSON: {"sql":"SELECT ..."}
+      const sqlPrompt = `Gere SQL DuckDB/MotherDuck. Use APENAS colunas listadas. NUNCA invente.
+Responda APENAS JSON: {"sql":"SELECT ..."}
 ${SCHEMA_COMPLETO}`;
 
-      const raw = await callGemini(sqlPrompt, pergunta, geminiKey, 800);
+      const raw = await callGemini(sqlPrompt, pergunta, geminiKey, 600);
       if (raw === "ERROR:429") {
         return new Response(JSON.stringify({ erro: "Limite de requisições da IA atingido. Aguarde." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -460,9 +463,11 @@ ${SCHEMA_COMPLETO}`;
       }
       if (raw) {
         try {
-          const match = raw.match(/\{[\s\S]*\}/);
+          const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+          const match = cleaned.match(/\{[\s\S]*\}/);
           if (match) {
-            const parsed = JSON.parse(match[0]);
+            const jsonStr = match[0].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1f]/g, ' ');
+            const parsed = JSON.parse(jsonStr);
             if (parsed.sql) { sql = parsed.sql; usedAI = true; }
           }
         } catch {}
@@ -520,15 +525,17 @@ ${SCHEMA_COMPLETO}`;
       console.error("Query error:", queryErr.message, "SQL:", sql);
       // Retry with Gemini error correction
       const retryRaw = await callGemini(
-        `O SQL falhou. Corrija usando APENAS colunas que existem.\n${SCHEMA_COMPLETO}\nResponda APENAS JSON: {"sql":"SELECT ..."}`,
+        `SQL falhou. Corrija usando APENAS colunas existentes.\n${SCHEMA_COMPLETO}\nResponda APENAS JSON: {"sql":"SELECT ..."}`,
         `Pergunta: "${pergunta}"\nSQL: ${sql}\nErro: ${queryErr.message}`,
-        geminiKey, 800
+        geminiKey, 600
       );
       if (retryRaw && retryRaw !== "ERROR:429") {
         try {
-          const match = retryRaw.match(/\{[\s\S]*\}/);
+          const cleaned = retryRaw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+          const match = cleaned.match(/\{[\s\S]*\}/);
           if (match) {
-            const parsed = JSON.parse(match[0]);
+            const jsonStr = match[0].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1f]/g, ' ');
+            const parsed = JSON.parse(jsonStr);
             if (parsed.sql) {
               dados = await executarQuery(parsed.sql);
               sqlUsado = parsed.sql;
@@ -546,27 +553,22 @@ ${SCHEMA_COMPLETO}`;
       }
     }
 
-    // ── STEP 4: Gemini interprets data → text response ──
-    // For small/simple results, generate text algorithmically (save AI call)
+    // ── STEP 4: Format response as text ──
+    // Maximize algorithmic formatting, minimize AI calls for MVP efficiency
     let resposta: string;
 
     if (dados.length === 0) {
       resposta = "Não encontrei resultados para essa consulta. Tente reformular ou verificar os filtros (ano, município, cargo).";
-    } else if (dados.length <= 5 && Object.keys(dados[0]).length <= 3) {
-      // Simple results: format algorithmically, no AI needed
+    } else if (dados.length <= 15) {
+      // Format algorithmically — no AI call needed for most results
       resposta = formatSimpleResult(intent, entities, dados);
     } else {
-      // Complex results: use Gemini to write a nice text response
-      const dadosResumo = dados.length > 30
-        ? JSON.stringify(dados.slice(0, 30)) + `\n... (total: ${dados.length} registros)`
-        : JSON.stringify(dados);
-
+      // Large results: use Gemini only for interpretation (compact prompt)
+      const sample = dados.slice(0, 15);
       const textRaw = await callGemini(
-        `Você é um assistente de eleições de Goiás. Escreva uma resposta em texto (markdown) clara e informativa.
-NÃO mencione SQL, banco de dados ou termos técnicos. Use negrito, listas e tabelas quando útil.
-Inclua números relevantes. Seja direto mas completo.`,
-        `Pergunta: "${pergunta}"\nDados (${dados.length} registros):\n${dadosResumo}`,
-        geminiKey, 1500
+        `Assistente de eleições de Goiás. Responda em markdown. NÃO mencione SQL/banco. Use negrito e listas. Seja direto.`,
+        `Pergunta: "${pergunta}"\nDados (${dados.length} registros, amostra de 15):\n${JSON.stringify(sample)}`,
+        geminiKey, 800
       );
 
       resposta = (textRaw && textRaw !== "ERROR:429" && textRaw !== "ERROR:402")
