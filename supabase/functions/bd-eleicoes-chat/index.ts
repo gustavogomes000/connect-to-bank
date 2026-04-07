@@ -7,7 +7,7 @@ const corsHeaders = {
 // LOVABLE AI GATEWAY (for reports/charts)
 // =============================================
 
-async function callLovableAI(systemPrompt: string, userMessage: string, apiKey: string, maxTokens = 1200): Promise<string | null> {
+async function callLovableAI(systemPrompt: string, userMessage: string, apiKey: string, maxTokens = 4096): Promise<string | null> {
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -337,10 +337,11 @@ Deno.serve(async (req) => {
     if (!plan || intent === "generico") {
       const sqlPrompt = `Gere SQL DuckDB. Use APENAS colunas listadas. NUNCA invente.
 Escolha tipo_grafico: bar|pie|line|area|table|kpi
-Responda APENAS JSON: {"sql":"SELECT ...","tipo_grafico":"...","titulo":"...","descricao":"..."}
+Responda APENAS JSON válido, sem markdown, sem explicação:
+{"sql":"SELECT ...","tipo_grafico":"...","titulo":"...","descricao":"..."}
 ${SCHEMA_COMPLETO}`;
 
-      const raw = await callLovableAI(sqlPrompt, pergunta, lovableKey, 800);
+      const raw = await callLovableAI(sqlPrompt, pergunta, lovableKey, 2000);
       if (raw?.startsWith("ERROR:")) {
         const status = raw.split(":")[1];
         if (status === "429") {
@@ -356,12 +357,19 @@ ${SCHEMA_COMPLETO}`;
       }
       if (raw && !raw.startsWith("ERROR:")) {
         try {
-          const match = raw.match(/\{[\s\S]*\}/);
+          const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+          const match = cleaned.match(/\{[\s\S]*\}/);
           if (match) {
-            const p = JSON.parse(match[0]);
+            let jsonStr = match[0]
+              .replace(/,\s*}/g, '}')
+              .replace(/,\s*]/g, ']')
+              .replace(/[\x00-\x1f]/g, ' ');
+            const p = JSON.parse(jsonStr);
             if (p.sql) { plan = p as QueryPlan; usedAI = true; }
           }
-        } catch {}
+        } catch (parseErr) {
+          console.error("JSON parse error from AI:", parseErr);
+        }
       }
     }
 
@@ -413,15 +421,17 @@ ${SCHEMA_COMPLETO}`;
       // Retry with AI correction
       if (lovableKey) {
         const retryRaw = await callLovableAI(
-          `SQL falhou. Corrija usando APENAS colunas existentes.\n${SCHEMA_COMPLETO}\nResponda APENAS JSON: {"sql":"SELECT ...","tipo_grafico":"...","titulo":"...","descricao":"..."}`,
+          `SQL falhou. Corrija usando APENAS colunas existentes.\n${SCHEMA_COMPLETO}\nResponda APENAS JSON válido sem markdown: {"sql":"SELECT ...","tipo_grafico":"...","titulo":"...","descricao":"..."}`,
           `Pergunta: "${pergunta}"\nSQL: ${plan.sql}\nErro: ${queryErr.message}`,
-          lovableKey, 800
+          lovableKey, 2000
         );
         if (retryRaw && !retryRaw.startsWith("ERROR:")) {
           try {
-            const m = retryRaw.match(/\{[\s\S]*\}/);
+            const cleaned = retryRaw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+            const m = cleaned.match(/\{[\s\S]*\}/);
             if (m) {
-              const rp = JSON.parse(m[0]);
+              const jsonStr = m[0].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1f]/g, ' ');
+              const rp = JSON.parse(jsonStr);
               if (rp.sql) {
                 dados = await exec(rp.sql);
                 plan = rp;
