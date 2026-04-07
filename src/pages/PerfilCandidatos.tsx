@@ -1,4 +1,4 @@
-import { usePerfilCandidatos, useFaixaEtaria, useDistribuicaoEscolaridade, useTopOcupacoes, useNacionalidade } from '@/hooks/useEleicoes';
+import { usePerfilCandidatos, useFaixaEtaria, useDistribuicaoEscolaridade, useTopOcupacoes, useUfNascimento } from '@/hooks/useEleicoes';
 import { formatNumber, formatPercent, CHART_COLORS } from '@/lib/eleicoes';
 import { ChartSkeleton } from '@/components/eleicoes/Skeletons';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Legend } from 'recharts';
@@ -9,7 +9,7 @@ export default function PerfilCandidatos() {
   const { data: faixaEtaria, isLoading: loadingIdade } = useFaixaEtaria();
   const { data: escolaridade, isLoading: loadingEsc } = useDistribuicaoEscolaridade();
   const { data: ocupacoes, isLoading: loadingOcup } = useTopOcupacoes();
-  const { data: nacionalidade, isLoading: loadingNac } = useNacionalidade();
+  const { data: nacionalidade, isLoading: loadingNac } = useUfNascimento();
 
   if (isLoading) return <ChartSkeleton />;
 
@@ -130,7 +130,7 @@ export default function PerfilCandidatos() {
 
         <div className="bg-card rounded-lg border border-border/50 p-4">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-2">
-            <Globe className="w-3 h-3" /> Nacionalidade
+            <Globe className="w-3 h-3" /> UF Nascimento
           </h3>
           {loadingNac ? <ChartSkeleton /> : (
             <>

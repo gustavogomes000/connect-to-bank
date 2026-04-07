@@ -392,7 +392,7 @@ export function useCandidato(id: string) {
           ${COL.cargo} as cargo, ${COL.municipio} as municipio, ${COL.ano} as ano,
           ${COL.genero} as genero, ${COL.escolaridade} as grau_instrucao,
           ${COL.ocupacao} as ocupacao, ${COL.situacaoFinal} as situacao_final,
-          ${COL.nascimento} as data_nascimento, ${COL.nacionalidade} as nacionalidade,
+          ${COL.nascimento} as data_nascimento, ${COL.ufNascimento} as uf_nascimento,
           ${COL.turno} as turno
         FROM ${MD.candidatos(null)}
         WHERE CAST(${COL.sequencial} AS VARCHAR) = '${id}'
@@ -859,15 +859,15 @@ export function useVotacaoPorZona(municipio?: string) {
   });
 }
 
-// ═══ NACIONALIDADE ═══
-export function useNacionalidade() {
+// ═══ UF NASCIMENTO ═══
+export function useUfNascimento() {
   const f = useFilters();
   return useQuery({
-    queryKey: ['nacionalidade', f],
+    queryKey: ['uf-nascimento', f],
     queryFn: async () => {
       const w = buildWhere(f);
       return mdQuery<{nome: string; total: string}>(
-        `SELECT COALESCE(${COL.nacionalidade}, 'NÃO INFORMADO') as nome, count(*) as total
+        `SELECT COALESCE(${COL.ufNascimento}, 'NÃO INFORMADO') as nome, count(*) as total
         FROM ${candTable(f)} ${w} GROUP BY nome ORDER BY total DESC`
       ).then(rows => rows.map(r => ({ nome: r.nome, total: Number(r.total) })));
     },
