@@ -380,14 +380,14 @@ export function useRanking(search: string, page: number, sortBy: string, sortAsc
 // ═══════════════════════════════════════════════════════════════
 
 export function useCandidato(id: string) {
-  return useQuery({
+  return useQuery<Record<string, any> | null>({
     queryKey: ['candidato', id],
-    queryFn: async () => {
+    queryFn: async (): Promise<Record<string, any> | null> => {
       const anos = getAnosDisponiveis('candidatos');
       for (const ano of [...anos].reverse()) {
         try {
           const rows = await mdQuery(sqlPerfilCandidato(ano, { sq: id }));
-          if (rows.length > 0) return { ...rows[0], ano };
+          if (rows.length > 0) return { ...rows[0], ano } as Record<string, any>;
         } catch { /* try next year */ }
       }
       return null;
@@ -1082,5 +1082,70 @@ export function useImportLogs() {
     queryKey: ['importLogs'],
     queryFn: async () => [],
     staleTime: 60 * 60 * 1000,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 36. VOTOS BRANCOS/NULOS
+// ═══════════════════════════════════════════════════════════════
+
+export function useVotosBrancosNulos() {
+  const f = useFilters();
+  return useQuery({
+    queryKey: ['votosBrancosNulos', f],
+    queryFn: async () => {
+      const anos = getAnosDisponiveis('detalhe_munzona');
+      const targetAnos = [f.ano];
+      const results = await Promise.all(targetAnos.map(async ano => {
+        const munFilter = f.municipio ? `AND NM_MUNICIPIO = '${f.municipio}'` : '';
+        try {
+          const [r] = await mdQuery<{ brancos: string; nulos: string; comp: string }>(
+            `SELECT SUM(QT_VOTOS_BRANCOS) AS brancos, SUM(QT_VOTOS_NULOS) AS nulos, SUM(QT_COMPARECIMENTO) AS comp
+            FROM ${getTableName('detalhe_munzona', ano)} WHERE 1=1 ${munFilter}`
+          );
+          const comp = Number(r?.comp || 0);
+          const brancos = Number(r?.brancos || 0);
+          const nulos = Number(r?.nulos || 0);
+          if (comp === 0) return null;
+          return { ano, brancos, nulos, comp, pctBrancos: (brancos / comp) * 100, pctNulos: (nulos / comp) * 100 };
+        } catch { return null; }
+      }));
+      return results.filter(Boolean).sort((a: any, b: any) => a.ano - b.ano);
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 37. PATRIMÔNIO VS VOTOS
+// ═══════════════════════════════════════════════════════════════
+
+export function usePatrimonioVsVotos() {
+  const f = useFilters();
+  return useQuery({
+    queryKey: ['patrimonioVsVotos', f],
+    queryFn: async () => {
+      const bens = getTableName('bens', f.ano);
+      const cand = getTableName('candidatos', f.ano);
+      const vot = getTableName('votacao', f.ano);
+      const conds: string[] = [];
+      if (f.municipio) conds.push(`c.NM_UE = '${f.municipio}'`);
+      const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+      try {
+        return await mdQuery(
+          `SELECT c.NM_URNA_CANDIDATO AS nome, c.SG_PARTIDO AS partido,
+            SUM(CAST(REPLACE(b.VR_BEM_CANDIDATO, ',', '.') AS DOUBLE)) AS patrimonio,
+            COALESCE(SUM(v.QT_VOTOS_NOMINAIS), 0) AS votos
+          FROM ${cand} c
+          JOIN ${bens} b ON c.SQ_CANDIDATO = b.SQ_CANDIDATO
+          LEFT JOIN ${vot} v ON c.SQ_CANDIDATO = v.SQ_CANDIDATO
+          ${where}
+          GROUP BY c.NM_URNA_CANDIDATO, c.SG_PARTIDO
+          HAVING SUM(CAST(REPLACE(b.VR_BEM_CANDIDATO, ',', '.') AS DOUBLE)) > 0
+          ORDER BY patrimonio DESC LIMIT 100`
+        );
+      } catch { return []; }
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
