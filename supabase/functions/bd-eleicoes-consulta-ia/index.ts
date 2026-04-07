@@ -3,10 +3,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// =============================================
-// LOVABLE AI GATEWAY HELPER
-// =============================================
-
 async function callLovableAI(systemPrompt: string, userMessage: string, apiKey: string, maxTokens = 2000): Promise<string | null> {
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -22,7 +18,7 @@ async function callLovableAI(systemPrompt: string, userMessage: string, apiKey: 
           { role: "user", content: userMessage },
         ],
         max_tokens: maxTokens,
-        temperature: 0.1,
+        temperature: 0.3,
       }),
     });
 
@@ -39,10 +35,6 @@ async function callLovableAI(systemPrompt: string, userMessage: string, apiKey: 
     return null;
   }
 }
-
-// =============================================
-// VALIDATED MOTHERDUCK SCHEMA (April 2026)
-// =============================================
 
 const SCHEMA_COMPLETO = `
 Tabelas MotherDuck (DuckDB). Banco: my_db. Sufixo: _YYYY_GO.
@@ -77,10 +69,8 @@ ATENÇÃO: Use APENAS as colunas listadas abaixo. NUNCA invente colunas.
    Colunas: ano_eleicao, nr_turno, nm_municipio, nr_zona, cd_cargo, ds_cargo,
    qt_aptos(BIGINT), qt_comparecimento(BIGINT), qt_abstencoes(BIGINT),
    qt_votos_brancos(BIGINT), qt_votos_nulos(BIGINT), qt_votos(BIGINT)
-   ⚠️ NÃO TEM: nm_bairro, nm_local_votacao
 
 5. my_db.comparecimento_abstencao_YYYY_GO (anos: 2018-2024)
-   É perfil demográfico de comparecimento, NÃO tem bairro/local.
    Colunas: ano_eleicao, nr_turno, nm_municipio, nr_zona,
    ds_genero, ds_estado_civil, ds_faixa_etaria, ds_grau_escolaridade, ds_cor_raca,
    qt_aptos(BIGINT), qt_comparecimento(BIGINT), qt_abstencao(BIGINT)
@@ -97,7 +87,6 @@ ATENÇÃO: Use APENAS as colunas listadas abaixo. NUNCA invente colunas.
    qt_aptos, qt_comparecimento, qt_abstencoes, qt_votos_nominais, qt_votos_brancos,
    qt_votos_nulos, qt_votos_legenda, nr_local_votacao, nm_local_votacao,
    ds_local_votacao_endereco
-   ⚠️ NÃO TEM: nm_bairro (use eleitorado_local para bairro)
 
 8. my_db.votacao_partido_munzona_YYYY_GO (anos: 2014-2024)
    Colunas: ano_eleicao, nr_turno, nm_municipio, nr_zona, cd_cargo, ds_cargo,
@@ -140,30 +129,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Step 1: AI generates SQL + visualization config
-    const systemPrompt = `Você é um analista de dados eleitorais especialista em Goiás.
-O usuário quer GERAR RELATÓRIOS e VISUALIZAÇÕES personalizadas.
-Interprete o pedido (pode ter erros de digitação) e gere a query SQL otimizada.
+    // Step 1: AI generates SQL
+    const sqlPrompt = `Você é um analista de dados eleitorais especialista em Goiás.
+O usuário faz perguntas em linguagem natural sobre eleições. Gere APENAS o SQL para consultar os dados.
 
-REGRAS CRÍTICAS:
+REGRAS:
 - Use APENAS as tabelas e colunas descritas abaixo. NUNCA invente.
 - Gere APENAS SELECT, nunca INSERT/UPDATE/DELETE
 - Use LIMIT máximo de 200
-- Escolha o tipo de gráfico MAIS ADEQUADO para os dados:
-  * bar: rankings, comparativos, contagens
-  * pie: distribuições percentuais (gênero, partido, etc.)
-  * line: evolução temporal, séries históricas
-  * area: evolução com ênfase em volume
-  * table: listagens detalhadas, dados com muitas colunas
-  * kpi: métricas resumidas (totais, médias, contagens)
 - Use nomes de colunas descritivos no SELECT (AS "Nome Legível")
-- Ordene dados de forma lógica (DESC para rankings, ASC para séries temporais)
-- Responda APENAS JSON válido:
-{"sql": "SELECT ...", "tipo_grafico": "bar|pie|line|area|table|kpi", "titulo": "...", "descricao": "..."}
+- Ordene dados de forma lógica
+- Responda APENAS JSON válido: {"sql": "SELECT ..."}
 
 ${SCHEMA_COMPLETO}`;
 
-    const rawText = await callLovableAI(systemPrompt, pergunta, lovableKey, 1500);
+    const rawText = await callLovableAI(sqlPrompt, pergunta, lovableKey, 1200);
 
     if (!rawText) {
       return new Response(JSON.stringify({ erro: "Erro ao consultar IA — tente novamente" }), {
@@ -173,7 +153,7 @@ ${SCHEMA_COMPLETO}`;
     if (rawText.startsWith("ERROR:")) {
       const status = rawText.split(":")[1];
       if (status === "429") {
-        return new Response(JSON.stringify({ erro: "Limite de requisições atingido. Aguarde alguns segundos e tente novamente." }), {
+        return new Response(JSON.stringify({ erro: "Limite de requisições atingido. Aguarde alguns segundos." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -189,13 +169,13 @@ ${SCHEMA_COMPLETO}`;
 
     const jsonMatch = rawText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return new Response(JSON.stringify({ erro: "IA não retornou formato válido", raw: rawText }), {
+      return new Response(JSON.stringify({ erro: "IA não retornou formato válido" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const parsed = JSON.parse(jsonMatch[0]);
-    const { sql, tipo_grafico, titulo, descricao } = parsed;
+    const { sql } = parsed;
 
     // Safety check
     const sqlUpper = sql.toUpperCase().trim();
@@ -220,102 +200,116 @@ ${SCHEMA_COMPLETO}`;
     }
 
     const { default: postgres } = await import("https://deno.land/x/postgresjs@v3.4.5/mod.js");
-    const pg = postgres({
-      hostname: "pg.us-east-1-aws.motherduck.com",
-      port: 5432,
-      username: "postgres",
-      password: mdToken,
-      database: "md:",
-      ssl: "require",
-      connection: { application_name: "eleicoesgo-relatorios" },
-      max: 1,
-      idle_timeout: 5,
-      connect_timeout: 15,
-    });
+    
+    async function executarQuery(sqlQuery: string) {
+      const pg = postgres({
+        hostname: "pg.us-east-1-aws.motherduck.com",
+        port: 5432, username: "postgres", password: mdToken,
+        database: "md:", ssl: "require",
+        connection: { application_name: "eleicoesgo-consulta" },
+        max: 1, idle_timeout: 5, connect_timeout: 15,
+      });
+      try {
+        const rows = await pg.unsafe(sqlQuery);
+        await pg.end();
+        return Array.isArray(rows) ? rows.map((r: any) => ({ ...r })) : [];
+      } catch (err) {
+        await pg.end().catch(() => {});
+        throw err;
+      }
+    }
+
+    let dados: Record<string, any>[];
+    let sqlUsado = sql;
 
     try {
-      const rows = await pg.unsafe(sql);
-      await pg.end();
-
-      const dados = Array.isArray(rows) ? rows.map((r: any) => ({ ...r })) : [];
-      const colunas = dados.length > 0 ? Object.keys(dados[0]) : [];
-
-      return new Response(JSON.stringify({
-        sucesso: true,
-        tipo_grafico: tipo_grafico || "table",
-        titulo: titulo || "Resultado",
-        descricao: descricao || "",
-        colunas,
-        dados,
-        sql_gerado: sql,
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      dados = await executarQuery(sql);
     } catch (queryErr: any) {
-      await pg.end().catch(() => {});
       console.error("Query error:", queryErr.message, "SQL:", sql);
-
+      
       // Auto-retry with error correction
       const retryPrompt = `O SQL anterior falhou. Corrija usando APENAS as colunas que existem.
 ${SCHEMA_COMPLETO}
-Responda APENAS JSON: {"sql":"SELECT ...","tipo_grafico":"...","titulo":"...","descricao":"..."}`;
+Responda APENAS JSON: {"sql":"SELECT ..."}`;
 
       const retryRaw = await callLovableAI(
         retryPrompt,
-        `Pergunta original: "${pergunta}"\nSQL que falhou: ${sql}\nErro: ${queryErr.message}\n\nGere um SQL corrigido.`,
-        lovableKey,
-        1200
+        `Pergunta: "${pergunta}"\nSQL falhou: ${sql}\nErro: ${queryErr.message}\nCorreija.`,
+        lovableKey, 1200
       );
 
       if (retryRaw && !retryRaw.startsWith("ERROR:")) {
-        try {
-          const retryMatch = retryRaw.match(/\{[\s\S]*\}/);
-          if (retryMatch) {
-            const retryParsed = JSON.parse(retryMatch[0]);
-            if (retryParsed.sql) {
-              const pg2 = postgres({
-                hostname: "pg.us-east-1-aws.motherduck.com",
-                port: 5432, username: "postgres", password: mdToken,
-                database: "md:", ssl: "require",
-                connection: { application_name: "eleicoesgo-relatorios-retry" },
-                max: 1, idle_timeout: 5, connect_timeout: 15,
-              });
-              try {
-                const rows2 = await pg2.unsafe(retryParsed.sql);
-                await pg2.end();
-                const dados2 = Array.isArray(rows2) ? rows2.map((r: any) => ({ ...r })) : [];
-                const colunas2 = dados2.length > 0 ? Object.keys(dados2[0]) : [];
-                return new Response(JSON.stringify({
-                  sucesso: true,
-                  tipo_grafico: retryParsed.tipo_grafico || "table",
-                  titulo: retryParsed.titulo || titulo || "Resultado",
-                  descricao: retryParsed.descricao || "",
-                  colunas: colunas2,
-                  dados: dados2,
-                  sql_gerado: retryParsed.sql,
-                  retry: true,
-                }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-              } catch {
-                await pg2.end().catch(() => {});
-              }
+        const retryMatch = retryRaw.match(/\{[\s\S]*\}/);
+        if (retryMatch) {
+          const retryParsed = JSON.parse(retryMatch[0]);
+          if (retryParsed.sql) {
+            try {
+              dados = await executarQuery(retryParsed.sql);
+              sqlUsado = retryParsed.sql;
+            } catch {
+              return new Response(JSON.stringify({
+                sucesso: false,
+                erro: `Não consegui consultar esses dados. Tente reformular.`,
+                sql_gerado: sql,
+              }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
             }
+          } else {
+            return new Response(JSON.stringify({ sucesso: false, erro: "Não consegui gerar a consulta." }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
           }
-        } catch {}
+        } else {
+          return new Response(JSON.stringify({ sucesso: false, erro: "Erro ao corrigir consulta." }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        return new Response(JSON.stringify({
+          sucesso: false, erro: `Erro na query: ${queryErr.message}`, sql_gerado: sql,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
-
-      return new Response(JSON.stringify({
-        sucesso: false,
-        erro: `Erro na query: ${queryErr.message}`,
-        sql_gerado: sql,
-        tipo_grafico: tipo_grafico || "table",
-        titulo: titulo || "Erro",
-        descricao: descricao || "",
-        colunas: [],
-        dados: [],
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
     }
+
+    // Step 3: AI interprets the data and writes a text answer
+    const answerPrompt = `Você é um assistente especialista em eleições de Goiás. O usuário fez uma pergunta e os dados foram consultados no banco.
+
+Sua tarefa: escreva uma RESPOSTA EM TEXTO claro, bem formatado e informativo, como se fosse o ChatGPT respondendo.
+
+REGRAS:
+- Responda em português do Brasil
+- Use formatação markdown: negrito, listas, tabelas quando útil
+- Inclua os números e dados relevantes na resposta
+- Seja direto e objetivo, mas completo
+- Se os dados estiverem vazios, diga que não encontrou resultados
+- NÃO mencione SQL, banco de dados ou termos técnicos
+- Fale como se os dados viessem do seu conhecimento sobre eleições de Goiás
+- Use emojis moderadamente para tornar a leitura agradável`;
+
+    const dadosResumo = dados.length > 50
+      ? JSON.stringify(dados.slice(0, 50)) + `\n... (total: ${dados.length} registros)`
+      : JSON.stringify(dados);
+
+    const respostaTexto = await callLovableAI(
+      answerPrompt,
+      `Pergunta do usuário: "${pergunta}"\n\nDados encontrados (${dados.length} registros):\n${dadosResumo}`,
+      lovableKey,
+      2000
+    );
+
+    const textoFinal = (respostaTexto && !respostaTexto.startsWith("ERROR:"))
+      ? respostaTexto
+      : dados.length === 0
+        ? "Não encontrei resultados para essa consulta. Tente reformular sua pergunta."
+        : `Encontrei ${dados.length} registros para sua consulta.`;
+
+    return new Response(JSON.stringify({
+      sucesso: true,
+      resposta: textoFinal,
+      sql_gerado: sqlUsado,
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
   } catch (e: any) {
     console.error("Error:", e);
     return new Response(JSON.stringify({ erro: e.message || "Erro interno" }), {
