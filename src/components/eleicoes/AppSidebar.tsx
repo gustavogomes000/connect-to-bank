@@ -10,8 +10,8 @@ import {
 import { cn } from '@/lib/utils';
 
 const analysisItems = [
-  { title: 'Consulta por IA', url: '/chat', icon: MessageSquare },
-  { title: 'Relatórios Personalizados', url: '/consulta', icon: Sparkles },
+  { title: 'Consulta por IA', url: '/consulta', icon: MessageSquare },
+  { title: 'Relatórios Personalizados', url: '/chat', icon: Sparkles },
   { title: 'Resultado por Eleição', url: '/resultado', icon: Vote },
   { title: 'Micro-Targeting', url: '/micro-targeting', icon: Crosshair },
   { title: 'Goiânia & Aparecida', url: '/territorial', icon: Target },
