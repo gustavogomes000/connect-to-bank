@@ -25,7 +25,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const HIDE_FILTERS = ['/ajuda', '/consulta', '/relatorios', '/config', '/territorial'];
+const HIDE_FILTERS = ['/ajuda', '/consulta', '/relatorios', '/config', '/territorial', '/zonal'];
 
 function Layout() {
   const location = useLocation();
