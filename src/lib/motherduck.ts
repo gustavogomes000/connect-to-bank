@@ -30,6 +30,7 @@ const DESPESAS_CONTRATADAS_ANOS = [2018, 2020, 2022, 2024];
 const DESPESAS_PAGAS_ANOS = [2018, 2020, 2022, 2024];
 const PESQUISA_ELEITORAL_ANOS = [2024];
 const PESQUISA_CONTRATANTE_ANOS = [2024];
+const COMP_ANOS = [2014, 2016, 2018, 2020, 2022, 2024];
 
 // Common columns for safe UNION ALL
 const CAND_COMMON_COLS = 'ano_eleicao, nr_turno, nm_candidato, nm_urna_candidato, sg_partido, nm_partido, ds_cargo, nm_ue, ds_genero, ds_grau_instrucao, ds_ocupacao, ds_sit_tot_turno, sq_candidato, nr_candidato, nr_cpf_candidato, dt_nascimento, ds_cor_raca, ds_estado_civil, sg_uf_nascimento, ds_situacao_candidatura';
