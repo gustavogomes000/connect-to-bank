@@ -26,8 +26,9 @@ async function callGemini(systemPrompt: string, userMessage: string, geminiKey: 
       }
     );
     if (!res.ok) {
-      console.error("Gemini error:", res.status, await res.text());
-      return null;
+      const errBody = await res.text();
+      console.error("Gemini error:", res.status, errBody);
+      return `ERROR:${res.status}:${errBody}`;
     }
     const data = await res.json();
     return data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
