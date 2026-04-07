@@ -24,13 +24,10 @@ except ImportError:
     print("   Sem pandas, arquivos XLS/XLSX serão IGNORADOS (só CSV/TSV processados)")
     print()
 
-# === CONFIGURAÇÃO ===
-PASTA_ZIPS = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(os.path.dirname(os.path.abspath(__file__))).parent / "dados" if not Path("*.zip").parent.exists() else Path(".")
-# Se rodar da pasta dos dados:
+# === CONFIGURACAO ===
+PASTA_ZIPS = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(os.path.dirname(os.path.abspath(__file__)))
 if not list(PASTA_ZIPS.glob("*.zip")):
     PASTA_ZIPS = Path(".")
-if not list(PASTA_ZIPS.glob("*.zip")):
-    PASTA_ZIPS = Path(r"C:\Users\Gustavo\Desktop\dados")
 
 PASTA_TEMP = PASTA_ZIPS / "_temp_extracao"
 PASTA_SAIDA = PASTA_ZIPS / "dados_go_prontos"
