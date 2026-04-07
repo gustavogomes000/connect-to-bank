@@ -522,15 +522,17 @@ ${SCHEMA_COMPLETO}`;
       console.error("Query error:", queryErr.message, "SQL:", sql);
       // Retry with Gemini error correction
       const retryRaw = await callGemini(
-        `O SQL falhou. Corrija usando APENAS colunas que existem.\n${SCHEMA_COMPLETO}\nResponda APENAS JSON: {"sql":"SELECT ..."}`,
+        `SQL falhou. Corrija usando APENAS colunas existentes.\n${SCHEMA_COMPLETO}\nResponda APENAS JSON: {"sql":"SELECT ..."}`,
         `Pergunta: "${pergunta}"\nSQL: ${sql}\nErro: ${queryErr.message}`,
-        geminiKey, 800
+        geminiKey, 600
       );
       if (retryRaw && retryRaw !== "ERROR:429") {
         try {
-          const match = retryRaw.match(/\{[\s\S]*\}/);
+          const cleaned = retryRaw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+          const match = cleaned.match(/\{[\s\S]*\}/);
           if (match) {
-            const parsed = JSON.parse(match[0]);
+            const jsonStr = match[0].replace(/,\s*}/g, '}').replace(/,\s*]/g, ']').replace(/[\x00-\x1f]/g, ' ');
+            const parsed = JSON.parse(jsonStr);
             if (parsed.sql) {
               dados = await executarQuery(parsed.sql);
               sqlUsado = parsed.sql;
