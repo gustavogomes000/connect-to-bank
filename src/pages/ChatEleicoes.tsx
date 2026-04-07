@@ -1,153 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { useChatEleicoes, type ChatMessage, type ChatResultado } from '@/hooks/useChatEleicoes';
 import { useChatFavoritos } from '@/hooks/useChatFavoritos';
-import { formatNumber, CHART_COLORS } from '@/lib/eleicoes';
+import { formatNumber } from '@/lib/eleicoes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, AreaChart, Area, Legend,
-} from 'recharts';
+import DynamicChart from '@/components/eleicoes/DynamicChart';
 import {
   MessageSquare, Send, Loader2, Code2, Trash2, Database,
   Lightbulb, BarChart3, Star, Bookmark, X, AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// ── INLINE CHART ──
-function InlineChart({ resultado }: { resultado: ChatResultado }) {
-  const { tipo_grafico, dados, colunas } = resultado;
-  if (!dados || dados.length === 0) return null;
-
-  const numericCols = colunas.filter(c => typeof dados[0]?.[c] === 'number' || !isNaN(Number(dados[0]?.[c])));
-  const textCols = colunas.filter(c => !numericCols.includes(c));
-  const labelCol = textCols[0] || colunas[0];
-  const valueCols = numericCols.length > 0 ? numericCols : colunas.filter(c => c !== labelCol);
-
-  const chartData = dados.map(row => {
-    const converted: Record<string, any> = {};
-    colunas.forEach(col => {
-      const val = row[col];
-      converted[col] = !isNaN(Number(val)) && val !== null && val !== '' ? Number(val) : val;
-    });
-    return converted;
-  });
-
-  const tooltipStyle = {
-    background: 'hsl(var(--popover))',
-    border: '1px solid hsl(var(--border))',
-    borderRadius: 8,
-    fontSize: 11,
-    boxShadow: '0 4px 12px hsl(var(--foreground) / 0.08)',
-  };
-
-  if (tipo_grafico === 'kpi') {
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-3">
-        {colunas.map(col => (
-          <div key={col} className="bg-background/50 rounded-xl p-3.5 text-center border border-border/20">
-            <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1.5 font-medium">{col.replace(/_/g, ' ')}</p>
-            <p className="text-xl font-bold text-foreground tracking-tight">
-              {typeof chartData[0]?.[col] === 'number' ? formatNumber(chartData[0][col]) : chartData[0]?.[col]}
-            </p>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (tipo_grafico === 'pie') {
-    return (
-      <div className="mt-3">
-        <ResponsiveContainer width="100%" height={280}>
-          <PieChart>
-            <Pie data={chartData} dataKey={valueCols[0] || colunas[1]} nameKey={labelCol} cx="50%" cy="50%" innerRadius={50} outerRadius={100} paddingAngle={2} strokeWidth={0}>
-              {chartData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-            </Pie>
-            <Tooltip formatter={(v: number) => formatNumber(v)} contentStyle={tooltipStyle} />
-            <Legend wrapperStyle={{ fontSize: 10 }} />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
-
-  if (tipo_grafico === 'line' || tipo_grafico === 'area') {
-    const ChartComp = tipo_grafico === 'line' ? LineChart : AreaChart;
-    return (
-      <div className="mt-3">
-        <ResponsiveContainer width="100%" height={280}>
-          <ChartComp data={chartData}>
-            <XAxis dataKey={labelCol} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-            <Tooltip formatter={(v: number) => formatNumber(v)} contentStyle={tooltipStyle} />
-            {valueCols.map((col, i) =>
-              tipo_grafico === 'line'
-                ? <Line key={col} type="monotone" dataKey={col} stroke={CHART_COLORS[i % CHART_COLORS.length]} strokeWidth={2.5} dot={{ r: 3 }} />
-                : <Area key={col} type="monotone" dataKey={col} fill={CHART_COLORS[i % CHART_COLORS.length]} stroke={CHART_COLORS[i % CHART_COLORS.length]} fillOpacity={0.15} strokeWidth={2} />
-            )}
-          </ChartComp>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
-
-  if (tipo_grafico === 'bar') {
-    const isHorizontal = chartData.length > 8;
-    return (
-      <div className="mt-3">
-        <ResponsiveContainer width="100%" height={isHorizontal ? Math.max(280, chartData.length * 28) : 280}>
-          <BarChart data={chartData} layout={isHorizontal ? 'vertical' : 'horizontal'} margin={isHorizontal ? { left: 100 } : undefined}>
-            {isHorizontal ? (
-              <>
-                <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <YAxis type="category" dataKey={labelCol} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} width={95} axisLine={false} tickLine={false} />
-              </>
-            ) : (
-              <>
-                <XAxis dataKey={labelCol} tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-              </>
-            )}
-            <Tooltip formatter={(v: number) => formatNumber(v)} contentStyle={tooltipStyle} cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} />
-            {valueCols.map((col, i) => (
-              <Bar key={col} dataKey={col} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={isHorizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
-
-  // Table fallback
-  return (
-    <div className="mt-3 overflow-x-auto max-h-[400px] rounded-lg border border-border/20">
-      <table className="w-full text-xs">
-        <thead className="sticky top-0 bg-muted/50 backdrop-blur-sm">
-          <tr className="border-b border-border/30">
-            <th className="px-2.5 py-2 text-left font-semibold text-muted-foreground text-[9px] uppercase tracking-wider">#</th>
-            {colunas.map(col => (
-              <th key={col} className="px-2.5 py-2 text-left font-semibold text-muted-foreground text-[9px] uppercase tracking-wider whitespace-nowrap">{col.replace(/_/g, ' ')}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {dados.map((row, i) => (
-            <tr key={i} className={cn('border-b border-border/10 hover:bg-muted/20', i % 2 === 0 && 'bg-muted/5')}>
-              <td className="px-2.5 py-1.5 text-muted-foreground/50 font-mono text-[9px]">{i + 1}</td>
-              {colunas.map(col => (
-                <td key={col} className="px-2.5 py-1.5 max-w-[200px] truncate">
-                  {typeof row[col] === 'number' ? formatNumber(row[col]) : row[col] ?? <span className="text-muted-foreground/30">—</span>}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 // ── MESSAGE BUBBLE ──
 function MessageBubble({ message, onSalvar, isSalvo }: { message: ChatMessage; onSalvar: (p: string) => void; isSalvo: boolean }) {
@@ -185,15 +48,15 @@ function MessageBubble({ message, onSalvar, isSalvo }: { message: ChatMessage; o
               )}
             </div>
 
-            {message.resultado?.sucesso && message.resultado.dados?.length > 0 && (
+            {message.resultado?.sucesso && message.resultado.dados_brutos?.length > 0 && (
               <>
                 <div className="flex items-center gap-2 mt-3 mb-1">
                   <Badge variant="outline" className="text-[8px] h-5 border-primary/20 text-primary">
                     <BarChart3 className="w-2.5 h-2.5 mr-1" />
-                    {message.resultado.tipo_grafico}
+                    {message.resultado.config_visual.tipo_grafico}
                   </Badge>
                   <Badge variant="secondary" className="text-[8px] h-5">
-                    {message.resultado.dados.length} registros
+                    {message.resultado.dados_brutos.length} registros
                   </Badge>
                   {message.resultado.sql_gerado && (
                     <button onClick={() => setShowSQL(!showSQL)} className="text-[8px] text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors">
@@ -206,7 +69,11 @@ function MessageBubble({ message, onSalvar, isSalvo }: { message: ChatMessage; o
                     {message.resultado.sql_gerado}
                   </pre>
                 )}
-                <InlineChart resultado={message.resultado} />
+                <DynamicChart
+                  configVisual={message.resultado.config_visual}
+                  dadosBrutos={message.resultado.dados_brutos}
+                  colunas={message.resultado.colunas}
+                />
               </>
             )}
 
