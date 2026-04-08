@@ -69,6 +69,7 @@ export default function Dashboard() {
   const { data: painel, isLoading: loadingPainel } = usePainelGeral(500);
   const { data: kpis, isLoading: loadingKpis } = useKPIs();
   const { data: comparecimento } = useComparecimento();
+  const { data: votosRegional, isLoading: loadingRegional } = useVotosRegional();
 
   const [sortKey, setSortKey] = useState<SortKey>('total_votos');
   const [sortAsc, setSortAsc] = useState(false);
