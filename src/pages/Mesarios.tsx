@@ -263,14 +263,6 @@ export default function Mesarios() {
                             </div>
                           )}
 
-                          {totalGenero > 0 && (
-                            <div className="flex items-center gap-1 text-[10px]">
-                              <span className="text-pink-500 font-semibold">{pctFem}% ♀</span>
-                              <span className="text-muted-foreground">·</span>
-                              <span className="text-blue-500 font-semibold">{pctMasc}% ♂</span>
-                            </div>
-                          )}
-
                           {e.voluntarios > 0 && (
                             <div className="flex items-center gap-1 text-[10px]">
                               <HandHelping className="w-3 h-3 text-green-500" />
@@ -282,6 +274,24 @@ export default function Mesarios() {
                             <Badge variant="outline" className="text-[8px] h-4">{fmt(e.totalFuncoes)} funções esp.</Badge>
                           )}
                         </div>
+
+                        {/* Barra de gênero */}
+                        {totalGenero > 0 && (
+                          <div className="mt-2">
+                            <div className="flex items-center justify-between text-[10px] mb-1">
+                              <span className="font-medium text-pink-500">♀ Feminino {pctFem}%</span>
+                              <span className="text-muted-foreground">{fmt(e.generoResumo.fem)} / {fmt(totalGenero)}</span>
+                              <span className="font-medium text-blue-500">♂ Masculino {pctMasc}%</span>
+                            </div>
+                            <div className="h-2 rounded-full overflow-hidden flex bg-muted">
+                              <div className="bg-pink-400 transition-all" style={{ width: `${pctFem}%` }} />
+                              <div className="bg-blue-400 transition-all" style={{ width: `${pctMasc}%` }} />
+                              {e.generoResumo.outro > 0 && (
+                                <div className="bg-muted-foreground/30 transition-all" style={{ width: `${100 - pctFem - pctMasc}%` }} />
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </CardContent>
