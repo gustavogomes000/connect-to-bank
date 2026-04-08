@@ -1,101 +1,141 @@
-import { useParams, Link } from 'react-router-dom';
-import { useDossieCandidato, useHistoricoCandidato, useEvolucaoPatrimonio } from '@/hooks/useEleicoes';
-import { formatNumber, formatPercent, formatBRL, formatBRLCompact, getPartidoCor, getAvatarColor, getInitial } from '@/lib/eleicoes';
-import { SituacaoBadge } from '@/components/eleicoes/SituacaoBadge';
-import { GeoFilterBadge } from '@/components/eleicoes/GeoFilterBadge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, Award, Bot, Building2, Coins, GraduationCap, Landmark, MapPinned, Search, Shield } from 'lucide-react';
+import { useConsultaIA } from '@/hooks/useConsultaIA';
+import { useQuery } from '@tanstack/react-query';
+import {
+  mdQuery,
+  getTableName,
+  getAnosDisponiveis,
+  sqlPerfilCandidato,
+  sqlPatrimonioCandidato,
+  sqlHistoricoCandidato,
+  sqlVotacaoTerritorialDetalhada,
+} from '@/lib/motherduck';
+import { useFilterStore } from '@/stores/filterStore';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Briefcase, GraduationCap, MapPin, Calendar, DollarSign, Shield, Vote, TrendingUp, History, Bot } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useFilterStore } from '@/store/filterStore';
-import { ListaBens, ResumoReceitas } from '@/components/FinanceiroCandidato';
-import { CentralInteligencia } from '@/components/CentralInteligencia';
-import { AIChatDashboard } from '@/components/AIChatDashboard';
+import { formatBRL } from '@/lib/eleicoes';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 // ═══════════════════════════════════════════════════════
 // Helpers
 // ═══════════════════════════════════════════════════════
 
-function maskCPF(cpf: string | null | undefined): string {
-  if (!cpf || cpf.length < 11) return '***.***.***-**';
-  const clean = cpf.replace(/\D/g, '');
-  if (clean.length !== 11) return '***.***.***-**';
-  return `${clean.slice(0, 3)}.***.***.${clean.slice(9)}`;
+type AnyRow = Record<string, any>;
+
+function toTitle(key: string) {
+  const k = key.replace(/[_\-]+/g, ' ').trim();
+  if (!k) return key;
+  return k
+    .split(' ')
+    .filter(Boolean)
+    .map(p => (p.length <= 3 ? p.toUpperCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
+    .join(' ');
 }
 
-function calcAge(dateStr: string | null | undefined): string {
-  if (!dateStr) return '—';
+function isNil(v: unknown) {
+  return v === null || v === undefined || v === '';
+}
+
+function fmtValue(key: string, v: any) {
+  if (isNil(v)) return '—';
+  if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
+
+  const keyL = key.toLowerCase();
+  const asNumber = typeof v === 'number' ? v : (typeof v === 'string' && v.match(/^\d+([.,]\d+)?$/) ? Number(v.replace(',', '.')) : null);
+
+  if (asNumber != null) {
+    if (keyL.includes('valor') || keyL.includes('vr_') || keyL.includes('patrimonio') || keyL.includes('receita')) {
+      return formatBRL(asNumber);
+    }
+    return asNumber.toLocaleString('pt-BR');
+  }
+
+  if (typeof v === 'string') return v;
   try {
-    const parts = dateStr.includes('/') ? dateStr.split('/') : dateStr.split('-');
-    let d: Date;
-    if (parts[0].length === 4) d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-    else d = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
-    const age = Math.floor((Date.now() - d.getTime()) / 31557600000);
-    return age > 0 && age < 120 ? `${age} anos` : '—';
-  } catch { return '—'; }
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
 }
 
-// ═══════════════════════════════════════════════════════
-// Info Row
-// ═══════════════════════════════════════════════════════
+function pickKey(row: AnyRow, candidates: string[]) {
+  const keys = Object.keys(row);
+  const lowerToActual = new Map(keys.map(k => [k.toLowerCase(), k]));
+  for (const c of candidates) {
+    const actual = lowerToActual.get(c.toLowerCase());
+    if (actual) return actual;
+  }
+  return null;
+}
 
-function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | null | undefined }) {
+function RecordGrid({ row, title, icon: Icon }: { row: AnyRow; title: string; icon: any }) {
+  const entries = Object.entries(row)
+    .filter(([_, v]) => !isNil(v))
+    .sort(([a], [b]) => a.localeCompare(b));
+
   return (
-    <div className="flex items-start gap-2 py-1.5">
-      <Icon className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
-      <div className="min-w-0">
-        <p className="text-[10px] text-accent uppercase tracking-wider font-semibold">{label}</p>
-        <p className="text-sm font-bold text-foreground uppercase truncate">{value || '—'}</p>
+    <section className="bg-white rounded-xl border border-border p-4">
+      <div className="flex items-center gap-2">
+        <Icon className="w-4 h-4 text-[#C8AA64]" />
+        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+        <Badge variant="outline" className="ml-auto text-[10px]">{entries.length} campos</Badge>
       </div>
-    </div>
+      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
+        {entries.map(([k, v]) => (
+          <div key={k} className="min-w-0">
+            <div className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">{toTitle(k)}</div>
+            <div className="text-sm text-slate-900 font-medium break-words">{fmtValue(k, v)}</div>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
-// ═══════════════════════════════════════════════════════
-// Timeline de Partidos
-// ═══════════════════════════════════════════════════════
+function aggregateVotos(rows: AnyRow[]) {
+  if (!rows.length) return { byZona: [] as AnyRow[], byZonaLocal: [] as AnyRow[] };
 
-function PartyTimeline({ historico }: { historico: any[] }) {
-  if (!historico || historico.length === 0) return null;
+  const municipioKey = pickKey(rows[0], ['nm_municipio', 'municipio', 'NM_MUNICIPIO']);
+  const zonaKey = pickKey(rows[0], ['nr_zona', 'zona', 'NR_ZONA']);
+  const localKey = pickKey(rows[0], ['nm_local_votacao', 'local_votacao', 'NM_LOCAL_VOTACAO', 'local']);
+  const votosKey =
+    pickKey(rows[0], ['qt_votos_nominais', 'total_votos', 'qt_votos', 'votos', 'QT_VOTOS_NOMINAIS']) ||
+    pickKey(rows[0], ['qt_votos_candidato', 'QT_VOTOS_CANDIDATO']);
 
-  // Deduplica por ano
-  const seen = new Set<number>();
-  const unique = historico.filter((h: any) => {
-    const ano = Number(h.ano);
-    if (seen.has(ano)) return false;
-    seen.add(ano);
-    return true;
-  }).sort((a: any, b: any) => Number(a.ano) - Number(b.ano));
+  const zonaAgg = new Map<string, number>();
+  const zlAgg = new Map<string, number>();
 
-  return (
-    <div className="bg-card rounded-lg border border-border/40 p-4">
-      <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Trajetória Partidária</h3>
-      <div className="relative flex items-center gap-0 overflow-x-auto pb-2">
-        {/* Connecting line */}
-        <div className="absolute top-5 left-4 right-4 h-px bg-border/60" />
+  for (const r of rows) {
+    const mun = municipioKey ? String(r[municipioKey] ?? '') : '';
+    const zona = zonaKey ? String(r[zonaKey] ?? '') : '';
+    const local = localKey ? String(r[localKey] ?? '') : '';
+    const votos = votosKey ? Number(r[votosKey] ?? 0) : 0;
+    const zKey = `${mun}||${zona}`;
+    const zlKey = `${mun}||${zona}||${local}`;
+    zonaAgg.set(zKey, (zonaAgg.get(zKey) || 0) + (Number.isFinite(votos) ? votos : 0));
+    zlAgg.set(zlKey, (zlAgg.get(zlKey) || 0) + (Number.isFinite(votos) ? votos : 0));
+  }
 
-        {unique.map((h: any, i: number) => {
-          const partido = h.partido || h.sigla_partido || '?';
-          const cor = getPartidoCor(partido);
-          return (
-            <div key={i} className="relative flex flex-col items-center min-w-[80px] px-2">
-              <div
-                className="w-10 h-10 rounded-full flex items-center justify-center text-[10px] font-bold z-10 border-2 border-background"
-                style={{ backgroundColor: cor + '30', color: cor, borderColor: cor }}
-              >
-                {partido}
-              </div>
-              <p className="text-[10px] font-bold mt-1.5">{h.ano}</p>
-              <p className="text-[9px] text-muted-foreground truncate max-w-[70px] text-center">{h.cargo}</p>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
+  const byZona = [...zonaAgg.entries()]
+    .map(([k, total_votos]) => {
+      const [municipio, zona] = k.split('||');
+      return { municipio, zona, total_votos };
+    })
+    .sort((a, b) => b.total_votos - a.total_votos);
+
+  const byZonaLocal = [...zlAgg.entries()]
+    .map(([k, total_votos]) => {
+      const [municipio, zona, local_votacao] = k.split('||');
+      return { municipio, zona, local_votacao, total_votos };
+    })
+    .sort((a, b) => b.total_votos - a.total_votos);
+
+  return { byZona, byZonaLocal };
 }
 
 // ═══════════════════════════════════════════════════════
@@ -105,21 +145,10 @@ function PartyTimeline({ historico }: { historico: any[] }) {
 function ProfileSkeleton() {
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
-      <Skeleton className="h-8 w-48" />
-      <div className="bg-card rounded-lg border border-border/40 p-6">
-        <div className="flex gap-6">
-          <Skeleton className="w-20 h-20 rounded-full shrink-0" />
-          <div className="flex-1 space-y-3">
-            <Skeleton className="h-6 w-64" />
-            <Skeleton className="h-4 w-40" />
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-10 w-full" />)}
-            </div>
-          </div>
-        </div>
-      </div>
-      <Skeleton className="h-16 w-full" />
-      <Skeleton className="h-64 w-full" />
+      <Skeleton className="h-7 w-56" />
+      <Skeleton className="h-32 w-full rounded-xl" />
+      <Skeleton className="h-64 w-full rounded-xl" />
+      <Skeleton className="h-64 w-full rounded-xl" />
     </div>
   );
 }
@@ -130,181 +159,896 @@ function ProfileSkeleton() {
 
 export default function CandidatoPerfil() {
   const { id } = useParams<{ id: string }>();
+  const sq = id || null;
+
   const { ano } = useFilterStore();
 
-  const {
-    perfil, bens, patrimonio, votacaoZona, votacaoTerritorial,
-    isLoading, error,
-  } = useDossieCandidato(id || null, ano);
+  // Helper: datasets have explicit year availability; avoid hard-crash
+  const canUseDataset = (dataset: string, year: number) => getAnosDisponiveis(dataset).includes(year);
+  const safeTable = (dataset: string, year: number) => {
+    if (!canUseDataset(dataset, year)) return null;
+    try {
+      return getTableName(dataset, year);
+    } catch {
+      return null;
+    }
+  };
 
-  const cpf = perfil?.cpf;
-  const { data: historico } = useHistoricoCandidato(cpf || null);
-  const nomeUrna = perfil?.candidato || perfil?.nome_urna || '';
-  const { data: evolucaoPatrimonio } = useEvolucaoPatrimonio(nomeUrna);
+  const candidatoQ = useQuery({
+    queryKey: ['md', 'cand', ano, sq],
+    enabled: !!sq,
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('candidatos', ano);
+      if (!t) return { table: null, row: null };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}' LIMIT 1`);
+      return { table: t, row: (rows[0] as AnyRow) || null };
+    },
+  });
 
-  if (isLoading) return <ProfileSkeleton />;
-  if (error) return <div className="p-8 text-center text-destructive text-sm">Erro: {(error as Error).message}</div>;
-  if (!perfil) return (
-    <div className="p-12 text-center space-y-3">
-      <p className="text-sm text-muted-foreground">Candidato não encontrado.</p>
-      <Link to="/"><Button variant="outline" size="sm"><ArrowLeft className="w-3.5 h-3.5 mr-1" />Voltar</Button></Link>
-    </div>
+  const complementarQ = useQuery({
+    queryKey: ['md', 'cand_complementar', ano, sq],
+    enabled: !!sq && canUseDataset('candidatos_complementar', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('candidatos_complementar', ano);
+      if (!t) return { table: null, row: null };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}' LIMIT 1`);
+      return { table: t, row: (rows[0] as AnyRow) || null };
+    },
+  });
+
+  const bensQ = useQuery({
+    queryKey: ['md', 'bens', ano, sq],
+    enabled: !!sq && canUseDataset('bens', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('bens', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const patrimonioQ = useQuery({
+    queryKey: ['md', 'patrimonio', ano, sq],
+    enabled: !!sq && canUseDataset('bens', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const rows = await mdQuery(sqlPatrimonioCandidato(ano, String(sq)));
+      return rows[0] as AnyRow | null;
+    },
+  });
+
+  const receitasQ = useQuery({
+    queryKey: ['md', 'receitas', ano, sq],
+    enabled: !!sq && canUseDataset('receitas', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('receitas', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const receitasDoadorOrigQ = useQuery({
+    queryKey: ['md', 'receitas_doador_originario', ano, sq],
+    enabled: !!sq && canUseDataset('receitas_doador', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('receitas_doador', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const redesSociaisQ = useQuery({
+    queryKey: ['md', 'rede_social', ano, sq],
+    enabled: !!sq && canUseDataset('rede_social', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('rede_social', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const cassacoesQ = useQuery({
+    queryKey: ['md', 'cassacoes', ano, sq],
+    enabled: !!sq && canUseDataset('cassacoes', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('cassacoes', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const despesasContratadasQ = useQuery({
+    queryKey: ['md', 'despesas_contratadas', ano, sq],
+    enabled: !!sq && canUseDataset('despesas_contratadas', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('despesas_contratadas', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const despesasPagasQ = useQuery({
+    queryKey: ['md', 'despesas_pagas', ano, sq],
+    enabled: !!sq && canUseDataset('despesas_pagas', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('despesas_pagas', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sq}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const votacaoTerritorialQ = useQuery({
+    queryKey: ['md', 'votacao_territorial', ano, sq],
+    enabled: !!sq && canUseDataset('votacao_secao', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const rows = await mdQuery(sqlVotacaoTerritorialDetalhada(ano, String(sq), { municipio: 'GOIÂNIA' } as any));
+      // Essa query já JOINa com eleitorado_local e entrega escola/bairro
+      return rows as AnyRow[];
+    },
+  });
+
+  const votacaoTerritorialAparecidaQ = useQuery({
+    queryKey: ['md', 'votacao_territorial_aparecida', ano, sq],
+    enabled: !!sq && canUseDataset('votacao_secao', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const rows = await mdQuery(sqlVotacaoTerritorialDetalhada(ano, String(sq), { municipio: 'APARECIDA DE GOIÂNIA' } as any));
+      return rows as AnyRow[];
+    },
+  });
+
+  const candidato = candidatoQ.data?.row;
+  const complementar = complementarQ.data?.row;
+  const bens = bensQ.data?.rows || [];
+  const receitas = receitasQ.data?.rows || [];
+  const receitasDoadorOrig = receitasDoadorOrigQ.data?.rows || [];
+  const redesSociais = redesSociaisQ.data?.rows || [];
+  const cassacoes = cassacoesQ.data?.rows || [];
+  const despesasContratadas = despesasContratadasQ.data?.rows || [];
+  const despesasPagas = despesasPagasQ.data?.rows || [];
+
+  const patrimonioTotal = Number(patrimonioQ.data?.patrimonio_total || 0);
+
+  const votacaoRows = useMemo(
+    () => [...(votacaoTerritorialQ.data || []), ...(votacaoTerritorialAparecidaQ.data || [])],
+    [votacaoTerritorialQ.data, votacaoTerritorialAparecidaQ.data],
   );
 
-  const patrimonioTotal = Number(patrimonio?.patrimonio_total || 0);
-  const totalBens = Number(patrimonio?.total_bens || 0);
-  const totalVotosZona = votacaoZona.reduce((s: number, r: any) => s + Number(r.total_votos || 0), 0);
+  const geo = useMemo(() => aggregateVotos(votacaoRows), [votacaoRows]);
+
+  const isLoading =
+    candidatoQ.isLoading ||
+    complementarQ.isLoading ||
+    bensQ.isLoading ||
+    patrimonioQ.isLoading ||
+    receitasQ.isLoading ||
+    receitasDoadorOrigQ.isLoading ||
+    redesSociaisQ.isLoading ||
+    cassacoesQ.isLoading ||
+    despesasContratadasQ.isLoading ||
+    despesasPagasQ.isLoading ||
+    votacaoTerritorialQ.isLoading ||
+    votacaoTerritorialAparecidaQ.isLoading;
+
+  const error =
+    candidatoQ.error ||
+    complementarQ.error ||
+    bensQ.error ||
+    patrimonioQ.error ||
+    receitasQ.error ||
+    receitasDoadorOrigQ.error ||
+    redesSociaisQ.error ||
+    cassacoesQ.error ||
+    despesasContratadasQ.error ||
+    despesasPagasQ.error ||
+    votacaoTerritorialQ.error ||
+    votacaoTerritorialAparecidaQ.error;
+
+  const cpfKey = candidato ? pickKey(candidato, ['NR_CPF_CANDIDATO', 'cpf', 'nr_cpf_candidato']) : null;
+  const cpf = cpfKey && candidato ? String(candidato[cpfKey] ?? '') : '';
+
+  const historicoQ = useQuery({
+    queryKey: ['md', 'historico', cpf],
+    enabled: !!cpf && cpf.length >= 8, // cpf costuma vir BIGINT sem máscara
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => mdQuery(sqlHistoricoCandidato(cpf)),
+  });
+
+  const nome = (candidato && (candidato.NM_URNA_CANDIDATO || candidato.candidato || candidato.NM_CANDIDATO)) || 'Candidato';
+
+  const linkedInRow = useMemo(() => {
+    if (!candidato) return null;
+    const allow = Object.keys({ ...candidato, ...(complementar || {}) }).filter(k => {
+      const kl = k.toLowerCase();
+      return (
+        kl.includes('fili') ||
+        kl.includes('partid') ||
+        kl.includes('colig') ||
+        kl.includes('escolar') ||
+        kl.includes('instrucao') ||
+        kl.includes('grau') ||
+        kl.includes('ocup') ||
+        kl.includes('cargo') ||
+        kl.includes('federacao')
+      );
+    });
+    const obj: AnyRow = {};
+    for (const k of allow) obj[k] = (candidato as AnyRow)[k] ?? (complementar as AnyRow | null)?.[k];
+    return obj;
+  }, [candidato, complementar]);
+
+  if (isLoading) return <ProfileSkeleton />;
+
+  if (error) {
+    return (
+      <div className="max-w-[1400px] mx-auto">
+        <div className="p-6 rounded-xl border border-border bg-white text-sm text-red-600">
+          Erro ao carregar dossiê: {(error as Error).message}
+        </div>
+      </div>
+    );
+  }
+
+  if (!candidato) {
+    return (
+      <div className="max-w-[1400px] mx-auto p-10 text-center space-y-3">
+        <p className="text-sm text-slate-500">Candidato não encontrado no MotherDuck.</p>
+        <Link to="/"><Button variant="outline" size="sm"><ArrowLeft className="w-3.5 h-3.5 mr-1" />Voltar</Button></Link>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
-      {/* Back */}
-      <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors">
+      <Link to="/" className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-900 transition-colors">
         <ArrowLeft className="w-3.5 h-3.5" /> Voltar ao Painel
       </Link>
 
-      {/* ── FICHA BIOGRÁFICA ── */}
-      <div className="bg-card rounded-lg border border-border/40 p-5">
-        <div className="flex flex-col md:flex-row gap-5">
-          {/* Avatar */}
-          <div className="shrink-0 flex flex-col items-center gap-2">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold border-2"
-              style={{
-                backgroundColor: getAvatarColor(nomeUrna) + '30',
-                color: getAvatarColor(nomeUrna),
-                borderColor: getAvatarColor(nomeUrna),
-              }}
-            >
-              {getInitial(nomeUrna)}
+      <section className="bg-white rounded-xl border border-border p-5">
+        <div className="flex flex-col md:flex-row gap-4 md:items-center">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-[#C8AA64]" />
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900 truncate">{String(nome)}</h1>
+              <Badge className="ml-auto bg-[#EC4899] text-white hover:bg-[#EC4899]/90">Dossiê 360º</Badge>
             </div>
-            <Badge variant="outline" className="text-[10px] font-mono">
-              Nº {perfil.numero}
-            </Badge>
+            <p className="text-xs text-slate-500 mt-1">
+              Fonte: <span className="font-mono">{candidatoQ.data?.table}</span>
+            </p>
           </div>
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-3 flex-wrap">
+          <div className="flex items-center gap-3 md:ml-auto">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-slate-50">
+              <Landmark className="w-4 h-4 text-[#C8AA64]" />
               <div>
-                <h1 className="text-2xl font-bold leading-tight uppercase text-foreground">{nomeUrna}</h1>
-                <p className="text-xs text-accent uppercase font-bold">{perfil.nome_completo}</p>
-              </div>
-              <div className="flex gap-2 items-center">
-                <span
-                  className="text-xs font-bold px-2 py-1 rounded"
-                  style={{ backgroundColor: getPartidoCor(perfil.partido) + '20', color: getPartidoCor(perfil.partido) }}
-                >
-                  {perfil.partido}
-                </span>
-                <SituacaoBadge situacao={perfil.situacao || perfil.situacao_candidatura} />
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Patrimônio total</div>
+                <div className="text-sm font-semibold text-slate-900">{patrimonioTotal > 0 ? formatBRL(patrimonioTotal) : '—'}</div>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-x-6 gap-y-2 mt-4 bg-muted/10 p-3 rounded-xl border border-border/20">
-              <InfoRow icon={Briefcase} label="Cargo" value={perfil.cargo} />
-              <InfoRow icon={MapPin} label="Município" value={perfil.municipio} />
-              <InfoRow icon={Calendar} label="Idade" value={calcAge(perfil.data_nascimento)} />
-              <InfoRow icon={User} label="Gênero" value={perfil.genero} />
-              <InfoRow icon={GraduationCap} label="Escolaridade" value={perfil.escolaridade} />
-              <InfoRow icon={Briefcase} label="Ocupação" value={perfil.ocupacao} />
-              <InfoRow icon={Shield} label="CPF" value={maskCPF(cpf)} />
-              <InfoRow icon={MapPin} label="Naturalidade" value={perfil.uf_nascimento} />
-            </div>
-
-            {/* Patrimônio highlight */}
-            <div className="mt-3 flex items-center gap-4 p-3 bg-muted/30 rounded-md border border-border/30">
-              <DollarSign className="w-5 h-5 text-warning shrink-0" />
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-slate-50">
+              <Award className="w-4 h-4 text-[#C8AA64]" />
               <div>
-                <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Patrimônio Total Declarado</p>
-                <p className="text-lg font-bold text-warning">{patrimonioTotal > 0 ? formatBRL(patrimonioTotal) : 'Não declarado'}</p>
+                <div className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Bens</div>
+                <div className="text-sm font-semibold text-slate-900">{bens.length.toLocaleString('pt-BR')}</div>
               </div>
-              <Badge variant="outline" className="text-[10px] ml-auto">{totalBens} bens</Badge>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ── TIMELINE DE PARTIDOS ── */}
-      <PartyTimeline historico={historico || []} />
+      <section className="bg-white rounded-xl border border-border p-4">
+        <div className="flex items-center gap-2">
+          <Shield className="w-4 h-4 text-[#C8AA64]" />
+          <h3 className="text-sm font-semibold text-slate-900">Histórico 2014–2024 (por CPF)</h3>
+          <Badge variant="outline" className="ml-auto text-[10px]">
+            CPF: <span className="font-mono ml-1">{cpf ? cpf : '—'}</span>
+          </Badge>
+        </div>
+        {!cpf ? (
+          <div className="mt-3 text-sm text-slate-500">CPF não encontrado no registro deste ano, não dá para consolidar 2014–2024.</div>
+        ) : historicoQ.isLoading ? (
+          <div className="mt-3"><Skeleton className="h-24 w-full" /></div>
+        ) : !historicoQ.data?.length ? (
+          <div className="mt-3 text-sm text-slate-500">Sem histórico retornado para este CPF.</div>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/60">
+                  <TableHead className="text-[10px] text-slate-500 w-[70px]">Ano</TableHead>
+                  <TableHead className="text-[10px] text-slate-500">Cargo</TableHead>
+                  <TableHead className="text-[10px] text-slate-500">Município</TableHead>
+                  <TableHead className="text-[10px] text-slate-500">Partido</TableHead>
+                  <TableHead className="text-[10px] text-slate-500">SQ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {historicoQ.data.map((r: any, i: number) => (
+                  <TableRow key={i} className="border-border/60">
+                    <TableCell className="text-sm font-mono text-slate-900">{r.ano}</TableCell>
+                    <TableCell className="text-xs text-slate-900">{r.cargo}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{r.municipio}</TableCell>
+                    <TableCell className="text-xs text-slate-900">{r.partido}</TableCell>
+                    <TableCell className="text-xs font-mono text-slate-500">{r.sq_candidato}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </section>
 
-      {/* ── ABAS DE DADOS ── */}
-      <Tabs defaultValue="historico" className="bg-card rounded-lg border border-border/40 overflow-hidden">
-        <TabsList className="w-full justify-start bg-muted/30 border-b border-border/30 rounded-none px-2 h-10">
-          <TabsTrigger value="historico" className="text-xs data-[state=active]:bg-background gap-1.5">
-            <History className="w-3.5 h-3.5" /> Evolução Histórica
-          </TabsTrigger>
-          <TabsTrigger value="territorial" className="text-xs data-[state=active]:bg-background gap-1.5">
-            <Vote className="w-3.5 h-3.5" /> Força Territorial
-          </TabsTrigger>
-          <TabsTrigger value="patrimonio" className="text-xs data-[state=active]:bg-background gap-1.5">
-            <TrendingUp className="w-3.5 h-3.5" /> Evolução Patrimonial
-          </TabsTrigger>
-          <TabsTrigger value="inteligencia" className="text-xs data-[state=active]:bg-background gap-1.5">
-            <Bot className="w-3.5 h-3.5" /> Inteligência Artificial
-          </TabsTrigger>
-        </TabsList>
+      {historicoQ.data?.length ? (
+        <section className="bg-white rounded-xl border border-border p-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-[#C8AA64]" />
+            <h3 className="text-sm font-semibold text-slate-900">Visão Completa 2014–2024 (dossiês por ano)</h3>
+            <Badge variant="outline" className="ml-auto text-[10px]">puxando tudo que existir</Badge>
+          </div>
+          <div className="mt-2 text-xs text-slate-500">
+            Cada ano usa o <span className="font-mono">SQ_CANDIDATO</span> daquele pleito (derivado do CPF) para puxar bens, finanças, cassações, redes e geografia do voto.
+          </div>
 
-        {/* ── ABA: EVOLUÇÃO HISTÓRICA ── */}
-        <TabsContent value="historico" className="p-0 mt-0">
-          {!historico || historico.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">
-              {cpf ? 'Nenhum histórico encontrado para este CPF.' : 'CPF não disponível para consulta histórica.'}
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
+          <div className="mt-3">
+            <Accordion type="multiple" className="w-full">
+              {historicoQ.data
+                .slice()
+                .sort((a: any, b: any) => Number(b.ano) - Number(a.ano))
+                .map((h: any) => (
+                  <AccordionItem key={`${h.ano}_${h.sq_candidato}`} value={`${h.ano}_${h.sq_candidato}`}>
+                    <AccordionTrigger className="text-sm text-slate-900 hover:no-underline">
+                      <div className="flex flex-wrap items-center gap-2 w-full pr-2">
+                        <span className="font-mono text-xs px-2 py-1 rounded bg-slate-50 border border-border">{h.ano}</span>
+                        <span className="font-semibold">{h.cargo}</span>
+                        <span className="text-slate-500">{h.municipio}</span>
+                        <Badge variant="outline" className="text-[10px]">{h.partido}</Badge>
+                        <span className="ml-auto text-[10px] text-slate-500 font-mono">SQ {h.sq_candidato}</span>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-2">
+                      <YearDossie ano={Number(h.ano)} sqCandidato={String(h.sq_candidato)} />
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+            </Accordion>
+          </div>
+        </section>
+      ) : null}
+
+      <RecordGrid row={candidato} title="Perfil (todas as colunas disponíveis - candidatos)" icon={Shield} />
+
+      {complementar && <RecordGrid row={complementar} title="Perfil Complementar (todas as colunas - complementar)" icon={Shield} />}
+
+      {linkedInRow && Object.keys(linkedInRow).length > 0 && (
+        <RecordGrid row={linkedInRow} title="LinkedIn Político (filiações, coligações, escolaridade, etc.)" icon={GraduationCap} />
+      )}
+
+      <section className="bg-white rounded-xl border border-border p-4">
+        <div className="flex items-center gap-2">
+          <Building2 className="w-4 h-4 text-[#C8AA64]" />
+          <h3 className="text-sm font-semibold text-slate-900">Patrimônio (lista completa de bens)</h3>
+          <Badge variant="outline" className="ml-auto text-[10px]">
+            Fonte: <span className="font-mono ml-1">{bensQ.data?.table}</span>
+          </Badge>
+        </div>
+        {!bens.length ? (
+          <div className="mt-3 text-sm text-slate-500">Sem bens encontrados para este candidato.</div>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border">
+                  <TableHead className="text-[10px] text-slate-500">Bem</TableHead>
+                  <TableHead className="text-[10px] text-slate-500">Tipo</TableHead>
+                  <TableHead className="text-[10px] text-slate-500 text-right">Valor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {bens.map((r, idx) => {
+                  const descKey = pickKey(r, ['ds_bem_candidato', 'descricao_bem', 'descricao', 'bem']);
+                  const tipoKey = pickKey(r, ['ds_tipo_bem_candidato', 'tipo_bem', 'tipo']);
+                  const valorKey = pickKey(r, ['vr_bem_candidato', 'valor_bem', 'valor']);
+                  return (
+                    <TableRow key={idx} className="border-border/60">
+                      <TableCell className="text-sm text-slate-900">{fmtValue(descKey || 'bem', descKey ? r[descKey] : '')}</TableCell>
+                      <TableCell className="text-xs text-slate-500">{fmtValue(tipoKey || 'tipo', tipoKey ? r[tipoKey] : '')}</TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right font-mono">
+                        {valorKey ? fmtValue(valorKey, r[valorKey]) : '—'}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </section>
+
+      <section className="bg-white rounded-xl border border-border p-4">
+        <div className="flex items-center gap-2">
+          <MapPinned className="w-4 h-4 text-[#C8AA64]" />
+          <h3 className="text-sm font-semibold text-slate-900">Geografia do Voto (Goiânia e Aparecida de Goiânia)</h3>
+          <Badge variant="outline" className="ml-auto text-[10px]">
+            Fonte: <span className="font-mono ml-1">{votacaoQ.data?.table}</span>
+          </Badge>
+        </div>
+
+        {!geo.byZona.length ? (
+          <div className="mt-3 text-sm text-slate-500">Sem registros de votação por seção para os municípios-alvo.</div>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-border">
+                Votos por Zona (agregado)
+              </div>
               <Table>
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent border-border/30">
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground w-[60px]">Ano</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground">Cargo</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground">Município</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground w-[80px]">Partido</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground text-center w-[100px]">Situação</TableHead>
+                  <TableRow className="border-border/60">
+                    <TableHead className="text-[10px] text-slate-500">Município</TableHead>
+                    <TableHead className="text-[10px] text-slate-500">Zona</TableHead>
+                    <TableHead className="text-[10px] text-slate-500 text-right">Votos</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {historico.map((h: any, i: number) => (
-                    <TableRow key={i} className="border-border/20 hover:bg-muted/30">
-                      <TableCell className="text-sm font-bold tabular-nums py-1.5">{h.ano}</TableCell>
-                      <TableCell className="text-xs py-1.5">{h.cargo}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground py-1.5">{h.municipio}</TableCell>
-                      <TableCell className="py-1.5">
-                        <span
-                          className="text-[10px] font-bold px-1.5 py-0.5 rounded"
-                          style={{ backgroundColor: getPartidoCor(h.partido || h.sigla_partido) + '20', color: getPartidoCor(h.partido || h.sigla_partido) }}
-                        >
-                          {h.partido || h.sigla_partido}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-center py-1.5">
-                        <SituacaoBadge situacao={h.situacao || h.situacao_final} />
-                      </TableCell>
+                  {geo.byZona.slice(0, 50).map((r, i) => (
+                    <TableRow key={i} className="border-border/60">
+                      <TableCell className="text-xs text-slate-500">{r.municipio}</TableCell>
+                      <TableCell className="text-sm text-slate-900 font-mono">{r.zona}</TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right font-mono">{Number(r.total_votos).toLocaleString('pt-BR')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             </div>
-          )}
-        </TabsContent>
 
-        {/* ── ABA: FORÇA TERRITORIAL (Central Inteligência) ── */}
-        <TabsContent value="territorial" className="p-4 mt-0 bg-muted/20">
-          <CentralInteligencia sqCandidato={id!} />
-        </TabsContent>
-
-        {/* ── ABA: FINANÇAS E PATRIMÔNIO ── */}
-        <TabsContent value="patrimonio" className="p-0 mt-0">
-          <div className="p-4 space-y-6">
-            <ResumoReceitas sqCandidato={id!} />
-            <ListaBens sqCandidato={id!} />
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-border">
+                Votos por Zona e Local de Votação (Escolas)
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-border/60">
+                    <TableHead className="text-[10px] text-slate-500">Município</TableHead>
+                    <TableHead className="text-[10px] text-slate-500">Zona</TableHead>
+                    <TableHead className="text-[10px] text-slate-500">Local</TableHead>
+                    <TableHead className="text-[10px] text-slate-500 text-right">Votos</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {geo.byZonaLocal.slice(0, 80).map((r, i) => (
+                    <TableRow key={i} className="border-border/60">
+                      <TableCell className="text-xs text-slate-500">{r.municipio}</TableCell>
+                      <TableCell className="text-xs text-slate-900 font-mono">{r.zona}</TableCell>
+                      <TableCell className="text-xs text-slate-900">{r.local_votacao || '—'}</TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right font-mono">{Number(r.total_votos).toLocaleString('pt-BR')}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-        </TabsContent>
+        )}
+      </section>
 
-        {/* ── ABA: ASSISTENTE IA ── */}
-        <TabsContent value="inteligencia" className="p-4 mt-0 bg-muted/20">
-          <AIChatDashboard sqCandidato={id!} nomeCandidato={nomeUrna} />
-        </TabsContent>
-      </Tabs>
+      <section className="bg-white rounded-xl border border-border p-4">
+        <div className="flex items-center gap-2">
+          <Coins className="w-4 h-4 text-[#C8AA64]" />
+          <h3 className="text-sm font-semibold text-slate-900">Finanças (receitas e doadores)</h3>
+          <Badge variant="outline" className="ml-auto text-[10px]">
+            Fonte: <span className="font-mono ml-1">{receitasQ.data?.table}</span>
+          </Badge>
+        </div>
+
+        {!receitas.length ? (
+          <div className="mt-3 text-sm text-slate-500">Sem receitas encontradas para este candidato.</div>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/60">
+                  <TableHead className="text-[10px] text-slate-500">Doador</TableHead>
+                  <TableHead className="text-[10px] text-slate-500">Origem</TableHead>
+                  <TableHead className="text-[10px] text-slate-500 text-right">Valor</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {receitas.slice(0, 200).map((r, idx) => {
+                  const doadorKey = pickKey(r, ['nm_doador', 'doador', 'nome_doador', 'NM_DOADOR']);
+                  const origemKey = pickKey(r, ['ds_origem_receita', 'origem', 'origem_receita', 'DS_ORIGEM_RECEITA']);
+                  const valorKey = pickKey(r, ['vr_receita', 'valor_receita', 'valor', 'VR_RECEITA']);
+                  return (
+                    <TableRow key={idx} className="border-border/60">
+                      <TableCell className="text-sm text-slate-900">{fmtValue(doadorKey || 'doador', doadorKey ? r[doadorKey] : '')}</TableCell>
+                      <TableCell className="text-xs text-slate-500">{fmtValue(origemKey || 'origem', origemKey ? r[origemKey] : '')}</TableCell>
+                      <TableCell className="text-sm text-slate-900 text-right font-mono">{valorKey ? fmtValue(valorKey, r[valorKey]) : '—'}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </section>
+
+      {(receitasDoadorOrig.length > 0 || despesasContratadas.length > 0 || despesasPagas.length > 0) && (
+        <section className="bg-white rounded-xl border border-border p-4">
+          <div className="flex items-center gap-2">
+            <Coins className="w-4 h-4 text-[#C8AA64]" />
+            <h3 className="text-sm font-semibold text-slate-900">Finanças (tabelas completas)</h3>
+            <Badge variant="outline" className="ml-auto text-[10px]">MotherDuck</Badge>
+          </div>
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
+            {receitasDoadorOrig.length > 0 && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+                  Doadores (originário) • <span className="font-mono">{receitasDoadorOrigQ.data?.table}</span>
+                </div>
+                <div className="text-sm font-semibold text-slate-900 mt-1">{receitasDoadorOrig.length.toLocaleString('pt-BR')} registros</div>
+              </div>
+            )}
+            {despesasContratadas.length > 0 && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+                  Despesas contratadas • <span className="font-mono">{despesasContratadasQ.data?.table}</span>
+                </div>
+                <div className="text-sm font-semibold text-slate-900 mt-1">{despesasContratadas.length.toLocaleString('pt-BR')} registros</div>
+              </div>
+            )}
+            {despesasPagas.length > 0 && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+                  Despesas pagas • <span className="font-mono">{despesasPagasQ.data?.table}</span>
+                </div>
+                <div className="text-sm font-semibold text-slate-900 mt-1">{despesasPagas.length.toLocaleString('pt-BR')} registros</div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {(redesSociais.length > 0 || cassacoes.length > 0) && (
+        <section className="bg-white rounded-xl border border-border p-4">
+          <div className="flex items-center gap-2">
+            <Shield className="w-4 h-4 text-[#C8AA64]" />
+            <h3 className="text-sm font-semibold text-slate-900">Risco e Presença Digital</h3>
+            <Badge variant="outline" className="ml-auto text-[10px]">MotherDuck</Badge>
+          </div>
+          <div className="mt-3 grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {redesSociais.length > 0 && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+                  Redes sociais • <span className="font-mono">{redesSociaisQ.data?.table}</span>
+                </div>
+                <div className="text-sm font-semibold text-slate-900 mt-1">{redesSociais.length.toLocaleString('pt-BR')} registros</div>
+              </div>
+            )}
+            {cassacoes.length > 0 && (
+              <div className="rounded-lg border border-border p-3">
+                <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+                  Cassações/Processos • <span className="font-mono">{cassacoesQ.data?.table}</span>
+                </div>
+                <div className="text-sm font-semibold text-slate-900 mt-1">{cassacoes.length.toLocaleString('pt-BR')} registros</div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      <CandidateContextChat
+        candidato={candidato}
+        patrimonioTotal={patrimonioTotal}
+        bensCount={bens.length}
+        geoZonaTop={geo.byZona.slice(0, 10)}
+      />
     </div>
+  );
+}
+
+function YearDossie({ ano, sqCandidato }: { ano: number; sqCandidato: string }) {
+  const canUseDataset = (dataset: string, year: number) => getAnosDisponiveis(dataset).includes(year);
+  const safeTable = (dataset: string, year: number) => {
+    if (!canUseDataset(dataset, year)) return null;
+    try {
+      return getTableName(dataset, year);
+    } catch {
+      return null;
+    }
+  };
+
+  const perfilQ = useQuery({
+    queryKey: ['md', 'year', ano, 'perfil', sqCandidato],
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      if (!canUseDataset('candidatos', ano)) return null;
+      const rows = await mdQuery(sqlPerfilCandidato(ano, { sq: sqCandidato }));
+      return (rows[0] as AnyRow) || null;
+    },
+  });
+
+  const bensQ = useQuery({
+    queryKey: ['md', 'year', ano, 'bens', sqCandidato],
+    enabled: canUseDataset('bens', ano),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('bens', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sqCandidato}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const patrimonioQ = useQuery({
+    queryKey: ['md', 'year', ano, 'patrimonio', sqCandidato],
+    enabled: canUseDataset('bens', ano),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const rows = await mdQuery(sqlPatrimonioCandidato(ano, sqCandidato));
+      return (rows[0] as AnyRow) || null;
+    },
+  });
+
+  const receitasQ = useQuery({
+    queryKey: ['md', 'year', ano, 'receitas', sqCandidato],
+    enabled: canUseDataset('receitas', ano),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('receitas', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sqCandidato}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const despesasPagasQ = useQuery({
+    queryKey: ['md', 'year', ano, 'despesas_pagas', sqCandidato],
+    enabled: canUseDataset('despesas_pagas', ano),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('despesas_pagas', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sqCandidato}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const cassacoesQ = useQuery({
+    queryKey: ['md', 'year', ano, 'cassacoes', sqCandidato],
+    enabled: canUseDataset('cassacoes', ano),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('cassacoes', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sqCandidato}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const redesQ = useQuery({
+    queryKey: ['md', 'year', ano, 'redes', sqCandidato],
+    enabled: canUseDataset('rede_social', ano),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => {
+      const t = safeTable('rede_social', ano);
+      if (!t) return { table: null, rows: [] as AnyRow[] };
+      const rows = await mdQuery(`SELECT * FROM ${t} WHERE SQ_CANDIDATO = '${sqCandidato}'`);
+      return { table: t, rows: (rows as AnyRow[]) || [] };
+    },
+  });
+
+  const votoGoianiaQ = useQuery({
+    queryKey: ['md', 'year', ano, 'voto_territorial_goiania', sqCandidato],
+    enabled: canUseDataset('votacao_secao', ano),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => mdQuery(sqlVotacaoTerritorialDetalhada(ano, sqCandidato, { municipio: 'GOIÂNIA' } as any)),
+  });
+
+  const votoAparecidaQ = useQuery({
+    queryKey: ['md', 'year', ano, 'voto_territorial_aparecida', sqCandidato],
+    enabled: canUseDataset('votacao_secao', ano),
+    staleTime: 10 * 60 * 1000,
+    queryFn: async () => mdQuery(sqlVotacaoTerritorialDetalhada(ano, sqCandidato, { municipio: 'APARECIDA DE GOIÂNIA' } as any)),
+  });
+
+  const bensCount = bensQ.data?.rows?.length || 0;
+  const receitasCount = receitasQ.data?.rows?.length || 0;
+  const despesasCount = despesasPagasQ.data?.rows?.length || 0;
+  const cassacoesCount = cassacoesQ.data?.rows?.length || 0;
+  const redesCount = redesQ.data?.rows?.length || 0;
+  const patrimonioTotal = Number(patrimonioQ.data?.patrimonio_total || 0);
+
+  const votoRows = useMemo(() => ([...(votoGoianiaQ.data || []), ...(votoAparecidaQ.data || [])] as AnyRow[]), [votoGoianiaQ.data, votoAparecidaQ.data]);
+  const geo = useMemo(() => aggregateVotos(votoRows), [votoRows]);
+
+  const loading =
+    perfilQ.isLoading ||
+    bensQ.isLoading ||
+    patrimonioQ.isLoading ||
+    receitasQ.isLoading ||
+    despesasPagasQ.isLoading ||
+    cassacoesQ.isLoading ||
+    redesQ.isLoading ||
+    votoGoianiaQ.isLoading ||
+    votoAparecidaQ.isLoading;
+
+  if (loading) return <Skeleton className="h-28 w-full" />;
+
+  return (
+    <div className="space-y-3">
+      {perfilQ.data ? (
+        <RecordGrid row={perfilQ.data} title={`Perfil ${ano} (todas as colunas)`} icon={Shield} />
+      ) : (
+        <div className="rounded-lg border border-border p-3 text-sm text-slate-500">
+          Sem perfil detalhado para {ano} (ou dataset não disponível).
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-2">
+        <div className="rounded-lg border border-border p-3 bg-white">
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Patrimônio</div>
+          <div className="text-sm font-semibold text-slate-900 mt-1">{patrimonioTotal ? formatBRL(patrimonioTotal) : '—'}</div>
+          <div className="text-[10px] text-slate-500 mt-1">{bensCount.toLocaleString('pt-BR')} bens</div>
+        </div>
+        <div className="rounded-lg border border-border p-3 bg-white">
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Receitas</div>
+          <div className="text-sm font-semibold text-slate-900 mt-1">{receitasCount.toLocaleString('pt-BR')} registros</div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">{receitasQ.data?.table || '—'}</div>
+        </div>
+        <div className="rounded-lg border border-border p-3 bg-white">
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Despesas pagas</div>
+          <div className="text-sm font-semibold text-slate-900 mt-1">{despesasCount.toLocaleString('pt-BR')} registros</div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">{despesasPagasQ.data?.table || '—'}</div>
+        </div>
+        <div className="rounded-lg border border-border p-3 bg-white">
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Cassações</div>
+          <div className="text-sm font-semibold text-slate-900 mt-1">{cassacoesCount.toLocaleString('pt-BR')} registros</div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">{cassacoesQ.data?.table || '—'}</div>
+        </div>
+        <div className="rounded-lg border border-border p-3 bg-white">
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Redes</div>
+          <div className="text-sm font-semibold text-slate-900 mt-1">{redesCount.toLocaleString('pt-BR')} registros</div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">{redesQ.data?.table || '—'}</div>
+        </div>
+      </div>
+
+      {geo.byZonaLocal.length ? (
+        <div className="rounded-xl border border-border overflow-hidden">
+          <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500 bg-slate-50 border-b border-border">
+            Geografia do voto {ano} (top 40 por escola)
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-border/60">
+                  <TableHead className="text-[10px] text-slate-500">Município</TableHead>
+                  <TableHead className="text-[10px] text-slate-500">Zona</TableHead>
+                  <TableHead className="text-[10px] text-slate-500">Local</TableHead>
+                  <TableHead className="text-[10px] text-slate-500 text-right">Votos</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {geo.byZonaLocal.slice(0, 40).map((r: any, i: number) => (
+                  <TableRow key={i} className="border-border/60">
+                    <TableCell className="text-xs text-slate-500">{r.municipio}</TableCell>
+                    <TableCell className="text-xs text-slate-900 font-mono">{r.zona}</TableCell>
+                    <TableCell className="text-xs text-slate-900">{r.local_votacao || '—'}</TableCell>
+                    <TableCell className="text-sm text-slate-900 text-right font-mono">{Number(r.total_votos).toLocaleString('pt-BR')}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CandidateContextChat({
+  candidato,
+  patrimonioTotal,
+  bensCount,
+  geoZonaTop,
+}: {
+  candidato: AnyRow;
+  patrimonioTotal: number;
+  bensCount: number;
+  geoZonaTop: AnyRow[];
+}) {
+  const { messages, loading, consultar, limpar } = useConsultaIA();
+  const [input, setInput] = useState('');
+
+  const context = useMemo(() => {
+    const id = candidato.sq_candidato ?? candidato.SQ_CANDIDATO ?? candidato.id ?? null;
+    const nome = candidato.nome_urna ?? candidato.nm_urna_candidato ?? candidato.candidato ?? candidato.nome_candidato ?? null;
+    const partido = candidato.sigla_partido ?? candidato.sg_partido ?? candidato.partido ?? null;
+    const cargo = candidato.cargo ?? candidato.ds_cargo ?? null;
+    const municipio = candidato.municipio ?? candidato.nm_ue ?? candidato.nm_municipio ?? null;
+
+    return {
+      id,
+      nome,
+      partido,
+      cargo,
+      municipio,
+      patrimonioTotal,
+      bensCount,
+      geoZonaTop,
+    };
+  }, [candidato, patrimonioTotal, bensCount, geoZonaTop]);
+
+  const onSend = async () => {
+    const q = input.trim();
+    if (!q || loading) return;
+    setInput('');
+
+    const prompt = [
+      'Você é um analista político. Responda com objetividade, em bullets curtos quando fizer sentido.',
+      'Contexto do candidato (GO):',
+      JSON.stringify(context),
+      '',
+      `Pergunta do usuário: ${q}`,
+    ].join('\n');
+
+    await consultar(prompt);
+  };
+
+  return (
+    <section className="bg-white rounded-xl border border-border p-4">
+      <div className="flex items-center gap-2">
+        <Bot className="w-4 h-4 text-[#C8AA64]" />
+        <h3 className="text-sm font-semibold text-slate-900">Chat de Contexto (Inteligência Política Total)</h3>
+        <Badge variant="outline" className="ml-auto text-[10px]">IA + contexto do perfil</Badge>
+      </div>
+
+      <div className="mt-2 text-xs text-slate-500">
+        Exemplos: <span className="font-medium text-slate-900">“Qual a maior fraqueza deste candidato em Aparecida?”</span> •{' '}
+        <span className="font-medium text-slate-900">“Qual o patrimônio total declarado?”</span>
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <Input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          placeholder="Pergunte algo estratégico sobre este candidato…"
+          className="bg-white"
+        />
+        <Button onClick={onSend} disabled={loading || !input.trim()} className="bg-[#EC4899] hover:bg-[#EC4899]/90">
+          <Search className="w-4 h-4 mr-2" />
+          Perguntar
+        </Button>
+        <Button variant="outline" onClick={limpar} disabled={!messages.length}>
+          Limpar
+        </Button>
+      </div>
+
+      {!!messages.length && (
+        <div className="mt-3 space-y-2">
+          {messages.slice(-6).map(m => (
+            <div key={m.id} className="rounded-lg border border-border p-3">
+              <div className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">
+                {m.role === 'user' ? 'Você' : 'IA'}
+              </div>
+              <div className="text-sm text-slate-900 whitespace-pre-wrap">{m.content || (m.status === 'loading' ? 'Pensando…' : '')}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

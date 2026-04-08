@@ -55,15 +55,14 @@ export default function ChatEleicoes() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto rounded-3xl overflow-hidden border border-[#EC4899]/20 shadow-2xl shadow-[#EC4899]/5" style={{ backgroundColor: '#0F1115' }}>
-      {/* Header Premium Glassmorphism */}
-      <div className="bg-[#1a1d24]/80 backdrop-blur-md p-4 border-b border-[#EC4899]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-10">
+    <div className="flex flex-col h-[calc(100vh-80px)] max-w-5xl mx-auto rounded-3xl overflow-hidden border border-border shadow-sm bg-white">
+      <div className="bg-white/80 backdrop-blur-md p-4 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-10">
         <div className="flex items-center gap-3">
-          <div className="bg-[#EC4899]/20 p-2 rounded-lg border border-[#EC4899]/30">
+          <div className="bg-[#EC4899]/10 p-2 rounded-lg border border-[#EC4899]/20">
             <Sparkles className="w-5 h-5 text-[#EC4899]" />
           </div>
           <div>
-            <h2 className="text-white font-bold tracking-wide">Assistente Estratégico AI</h2>
+            <h2 className="text-slate-900 font-bold tracking-wide">Assistente Estratégico AI</h2>
             <p className="text-[10px] text-[#EC4899] font-mono leading-none mt-1">Sarelli Inteligência Eleitoral</p>
           </div>
         </div>
@@ -85,17 +84,17 @@ export default function ChatEleicoes() {
             
             <div className={`max-w-[85%] md:max-w-[75%] p-4 rounded-2xl ${
               msg.role === 'user' 
-                ? 'bg-[#EC4899]/10 text-white rounded-br-sm border border-[#EC4899]/20 font-medium' 
-                : 'bg-[#1a1d24] text-gray-200 rounded-bl-sm border border-[#EC4899]/10 shadow-lg'
+                ? 'bg-[#EC4899]/10 text-slate-900 rounded-br-sm border border-[#EC4899]/20 font-medium' 
+                : 'bg-white text-slate-900 rounded-bl-sm border border-border shadow-sm'
             }`}>
               <div className="text-[10px] mb-2 opacity-70 font-bold uppercase tracking-wider flex items-center gap-1.5">
                 {msg.role === 'user' ? <User className="w-3 h-3" /> : <Bot className="w-3 h-3 text-[#EC4899]" />}
                 {msg.role === 'user' ? 'Você' : 'Sarelli AI'}
               </div>
               
-              <div className="prose prose-invert prose-sm md:prose-base prose-p:leading-relaxed prose-headings:text-[#EC4899] prose-a:text-[#EC4899] max-w-none 
-                prose-table:border-collapse prose-table:w-full prose-table:text-sm prose-th:bg-[#EC4899]/10 prose-th:p-2 prose-th:text-left prose-th:border-b prose-th:border-[#EC4899]/20 
-                prose-td:p-2 prose-td:border-b prose-td:border-[#EC4899]/10 prose-strong:text-white prose-strong:font-bold prose-ul:list-disc prose-ul:pl-4">
+              <div className="prose prose-sm md:prose-base prose-p:leading-relaxed prose-headings:text-[#EC4899] prose-a:text-[#EC4899] max-w-none 
+                prose-table:border-collapse prose-table:w-full prose-table:text-sm prose-th:bg-[#EC4899]/10 prose-th:p-2 prose-th:text-left prose-th:border-b prose-th:border-border 
+                prose-td:p-2 prose-td:border-b prose-td:border-border prose-strong:text-slate-900 prose-strong:font-bold prose-ul:list-disc prose-ul:pl-4">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {msg.content}
                 </ReactMarkdown>
@@ -103,8 +102,8 @@ export default function ChatEleicoes() {
             </div>
 
             {msg.role === 'user' && (
-              <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gray-800 flex items-center justify-center shrink-0 border border-gray-700">
-                <User className="w-5 h-5 text-gray-400" />
+              <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0 border border-border">
+                <User className="w-5 h-5 text-slate-500" />
               </div>
             )}
           </div>
@@ -115,7 +114,7 @@ export default function ChatEleicoes() {
             <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-[#EC4899] to-[#c026d3] flex items-center justify-center shrink-0">
               <Bot className="w-5 h-5 text-white animate-pulse" />
             </div>
-            <div className="p-4 rounded-2xl bg-[#1a1d24] rounded-bl-sm border border-[#EC4899]/10 max-w-[200px]">
+            <div className="p-4 rounded-2xl bg-white rounded-bl-sm border border-border max-w-[200px]">
               <div className="flex space-x-2 items-center h-full">
                 <div className="w-2 h-2 bg-[#EC4899] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
                 <div className="w-2 h-2 bg-[#EC4899] rounded-full animate-bounce [animation-delay:-0.15s]"></div>
@@ -127,11 +126,11 @@ export default function ChatEleicoes() {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 bg-[#1a1d24]/60 backdrop-blur-xl border-t border-[#EC4899]/20">
+      <div className="p-4 bg-white/70 backdrop-blur-xl border-t border-border">
         <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="relative flex items-center mx-auto w-full group">
           <input
             type="text"
-            className="w-full bg-black/50 border border-gray-700 focus:border-[#EC4899]/50 focus:ring-1 focus:ring-[#EC4899]/50 focus:bg-[#0F1115] text-white placeholder-gray-500/70 rounded-full py-4 pl-6 pr-16 outline-none transition-all duration-300 backdrop-blur-sm"
+            className="w-full bg-white border border-border focus:border-[#EC4899]/50 focus:ring-1 focus:ring-[#EC4899]/30 text-slate-900 placeholder-slate-400 rounded-full py-4 pl-6 pr-16 outline-none transition-all duration-300"
             placeholder="Pergunte sobre setores eleitorais, lideranças ou finanças..."
             value={input}
             onChange={e => setInput(e.target.value)}
@@ -145,8 +144,8 @@ export default function ChatEleicoes() {
             <Send className="w-4 h-4 ml-0.5" />
           </button>
         </form>
-        <p className="text-center text-[10px] text-gray-500/80 mt-3 font-mono">
-          As consultas geram SQL Zero-IA validadas executadas em alta-performance no <span className="text-[#EC4899]/70">MotherDuck</span>.
+        <p className="text-center text-[10px] text-slate-500 mt-3 font-mono">
+          As consultas geram SQL Zero-IA validadas executadas em alta-performance no <span className="text-[#EC4899]">MotherDuck</span>.
         </p>
       </div>
     </div>
