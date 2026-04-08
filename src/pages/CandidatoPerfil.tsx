@@ -284,6 +284,9 @@ function HistoricoEleitoral({ historico, currentAno }: { historico: AnyRow[]; cu
   const [expandedYear, setExpandedYear] = useState<number | null>(null);
   const [zonasData, setZonasData] = useState<Record<number, AnyRow[]>>({});
   const [loadingZonas, setLoadingZonas] = useState<number | null>(null);
+  const [expandedZona, setExpandedZona] = useState<string | null>(null); // "ano-zona"
+  const [locaisData, setLocaisData] = useState<Record<string, AnyRow[]>>({});
+  const [loadingLocais, setLoadingLocais] = useState<string | null>(null);
 
   // Build timeline with all years, filling gaps with "Não candidatou"
   const timeline = useMemo(() => {
