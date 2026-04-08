@@ -10,20 +10,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, Users, ChevronDown, ChevronRight, School, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/** Busca mesários agrupados por zona */
-function useMesariosPorZona() {
+function useMesariosCompleto() {
   const ano = useFilterStore((s) => s.ano);
   const municipio = useFilterStore((s) => s.municipio);
+  const zona = useFilterStore((s) => s.zona);
 
   return useQuery({
-    queryKey: ['mesarios-zona', ano, municipio],
+    queryKey: ['mesarios-completo', ano, municipio, zona],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('bd_eleicoes_mesarios')
         .select('*')
         .eq('ano', ano)
-        .eq('municipio', municipio)
-        .order('zona', { ascending: true });
+        .eq('municipio', municipio);
+      if (zona) q = q.eq('zona', zona);
+      const { data, error } = await q.order('zona').order('qt_convocados', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -32,20 +33,21 @@ function useMesariosPorZona() {
   });
 }
 
-/** Busca funções especiais */
-function useFuncoesEspeciaisPorZona() {
+function useFuncoesCompleto() {
   const ano = useFilterStore((s) => s.ano);
   const municipio = useFilterStore((s) => s.municipio);
+  const zona = useFilterStore((s) => s.zona);
 
   return useQuery({
-    queryKey: ['funcoes-esp-zona', ano, municipio],
+    queryKey: ['funcoes-completo', ano, municipio, zona],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('bd_eleicoes_mesarios_funcoes_especiais')
         .select('*')
         .eq('ano', ano)
-        .eq('municipio', municipio)
-        .order('zona', { ascending: true });
+        .eq('municipio', municipio);
+      if (zona) q = q.eq('zona', zona);
+      const { data, error } = await q.order('zona').order('qt_convocados', { ascending: false });
       if (error) throw error;
       return data || [];
     },
@@ -54,20 +56,21 @@ function useFuncoesEspeciaisPorZona() {
   });
 }
 
-/** Busca locais de votação para mapear zona→escola */
-function useLocaisVotacao() {
+function useLocais() {
   const ano = useFilterStore((s) => s.ano);
   const municipio = useFilterStore((s) => s.municipio);
+  const zona = useFilterStore((s) => s.zona);
 
   return useQuery({
-    queryKey: ['locais-votacao-mesarios', ano, municipio],
+    queryKey: ['locais-mesarios', ano, municipio, zona],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('bd_eleicoes_locais_votacao')
-        .select('zona, local_votacao, bairro, endereco_local, eleitorado_apto')
+        .select('zona, local_votacao, bairro, endereco_local, eleitorado_apto, secao')
         .eq('ano', ano)
-        .eq('municipio', municipio)
-        .limit(5000);
+        .eq('municipio', municipio);
+      if (zona) q = q.eq('zona', zona);
+      const { data, error } = await q.limit(5000);
       if (error) throw error;
       return data || [];
     },
@@ -82,68 +85,74 @@ interface EscolaGroup {
   endereco: string;
   zona: number;
   eleitores: number;
+  secoes: number;
   mesarios: any[];
-  funcoesEspeciais: any[];
+  funcoes: any[];
   totalConvocados: number;
+  totalFuncoes: number;
 }
 
+const fmt = (n: number) => n.toLocaleString('pt-BR');
+
 export default function Mesarios() {
-  const { data: mesarios, isLoading: loadM } = useMesariosPorZona();
-  const { data: funcoes, isLoading: loadF } = useFuncoesEspeciaisPorZona();
-  const { data: locais, isLoading: loadL } = useLocaisVotacao();
-  const { municipio, ano } = useFilterStore();
+  const { data: mesarios, isLoading: lM } = useMesariosCompleto();
+  const { data: funcoes, isLoading: lF } = useFuncoesCompleto();
+  const { data: locais, isLoading: lL } = useLocais();
+  const { municipio, ano, zona: zonaFiltro } = useFilterStore();
   const [busca, setBusca] = useState('');
-  const [expandedEscola, setExpandedEscola] = useState<string | null>(null);
+  const [expandido, setExpandido] = useState<string | null>(null);
 
-  // Agrupa por escola (via zona → locais de votação)
-  const escolasAgrupadas = useMemo(() => {
-    if (!locais || !mesarios) return [];
+  const escolas = useMemo(() => {
+    if (!locais) return [];
 
-    // Mapa zona → escolas
-    const escolaMap = new Map<string, { escola: string; bairro: string; endereco: string; zona: number; eleitores: number }>();
+    // Agrupa locais por escola
+    const map = new Map<string, { escola: string; bairro: string; endereco: string; zona: number; eleitores: number; secoes: Set<number> }>();
     for (const l of locais) {
-      const key = l.local_votacao || `Zona ${l.zona}`;
-      if (!escolaMap.has(key)) {
-        escolaMap.set(key, {
-          escola: key,
+      const key = `${l.local_votacao || 'Zona ' + l.zona}__${l.zona}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          escola: l.local_votacao || `Zona ${l.zona}`,
           bairro: l.bairro || '',
           endereco: l.endereco_local || '',
           zona: l.zona || 0,
           eleitores: 0,
+          secoes: new Set(),
         });
       }
-      const e = escolaMap.get(key)!;
+      const e = map.get(key)!;
       e.eleitores += l.eleitorado_apto || 0;
+      if (l.secao) e.secoes.add(l.secao);
     }
 
-    // Mapa zona → mesários
-    const mesariosPorZona = new Map<number, any[]>();
-    for (const m of mesarios) {
+    // Indexa mesários e funções por zona
+    const mesPorZona = new Map<number, any[]>();
+    for (const m of (mesarios || [])) {
       const z = m.zona || 0;
-      if (!mesariosPorZona.has(z)) mesariosPorZona.set(z, []);
-      mesariosPorZona.get(z)!.push(m);
+      if (!mesPorZona.has(z)) mesPorZona.set(z, []);
+      mesPorZona.get(z)!.push(m);
     }
-
-    // Mapa zona → funções especiais
-    const funcoesPorZona = new Map<number, any[]>();
-    if (funcoes) {
-      for (const f of funcoes) {
-        const z = f.zona || 0;
-        if (!funcoesPorZona.has(z)) funcoesPorZona.set(z, []);
-        funcoesPorZona.get(z)!.push(f);
-      }
+    const funPorZona = new Map<number, any[]>();
+    for (const f of (funcoes || [])) {
+      const z = f.zona || 0;
+      if (!funPorZona.has(z)) funPorZona.set(z, []);
+      funPorZona.get(z)!.push(f);
     }
 
     const result: EscolaGroup[] = [];
-    for (const [, info] of escolaMap) {
-      const mes = mesariosPorZona.get(info.zona) || [];
-      const fe = funcoesPorZona.get(info.zona) || [];
-      const totalConv = mes.reduce((s, r) => s + (r.qt_convocados || 0), 0);
+    for (const [, info] of map) {
+      const mes = mesPorZona.get(info.zona) || [];
+      const fun = funPorZona.get(info.zona) || [];
       result.push({
-        ...info,
+        escola: info.escola,
+        bairro: info.bairro,
+        endereco: info.endereco,
+        zona: info.zona,
+        eleitores: info.eleitores,
+        secoes: info.secoes.size,
         mesarios: mes,
-        funcoesEspeciais: fe,
-        totalConvocados: totalConv,
+        funcoes: fun,
+        totalConvocados: mes.reduce((s, r) => s + (r.qt_convocados || 0), 0),
+        totalFuncoes: fun.reduce((s, r) => s + (r.qt_convocados || 0), 0),
       });
     }
 
@@ -151,42 +160,43 @@ export default function Mesarios() {
   }, [locais, mesarios, funcoes]);
 
   const filtered = useMemo(() => {
-    if (!busca) return escolasAgrupadas;
+    if (!busca) return escolas;
     const q = busca.toLowerCase();
-    return escolasAgrupadas.filter(e =>
+    return escolas.filter(e =>
       e.escola.toLowerCase().includes(q) ||
       e.bairro.toLowerCase().includes(q) ||
-      e.zona.toString().includes(q)
+      e.zona.toString().includes(q) ||
+      e.endereco.toLowerCase().includes(q)
     );
-  }, [escolasAgrupadas, busca]);
+  }, [escolas, busca]);
 
-  const totalMesarios = mesarios?.reduce((s, r) => s + (r.qt_convocados || 0), 0) || 0;
-  const isLoading = loadM || loadF || loadL;
+  const totalGeral = escolas.reduce((s, e) => s + e.totalConvocados, 0);
+  const totalEleitores = escolas.reduce((s, e) => s + e.eleitores, 0);
 
-  if (isLoading) {
+  if (lM || lF || lL) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-10 w-full" />
-        {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-14" />)}
+        <Skeleton className="h-9 w-full" />
+        {[...Array(6)].map((_, i) => <Skeleton key={i} className="h-12" />)}
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-lg font-bold text-foreground">Mesários por Escola</h1>
-          <p className="text-xs text-muted-foreground">{municipio} — {ano} • Fonte: TSE</p>
+          <p className="text-xs text-muted-foreground">
+            {municipio}{zonaFiltro ? ` • Zona ${zonaFiltro}` : ''} — {ano} • Fonte: TSE
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-[10px]">
-            {filtered.length} escolas
-          </Badge>
-          <Badge variant="outline" className="text-[10px]">
-            {totalMesarios.toLocaleString('pt-BR')} convocados
-          </Badge>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Badge variant="secondary" className="text-[10px]">{filtered.length} escolas</Badge>
+          <Badge variant="outline" className="text-[10px]">{fmt(totalGeral)} convocados</Badge>
+          <Badge variant="outline" className="text-[10px]">{fmt(totalEleitores)} eleitores</Badge>
         </div>
       </div>
 
@@ -194,57 +204,47 @@ export default function Mesarios() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Buscar escola, bairro ou zona..."
+          placeholder="Buscar escola, bairro, endereço ou zona..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
           className="pl-9 h-9 text-sm"
         />
       </div>
 
-      {/* Nota sobre dados */}
-      <p className="text-[10px] text-muted-foreground italic">
-        ⚠️ Dados do TSE são agregados por zona — não contêm nomes individuais. Mostrando perfil demográfico dos mesários por escola.
-      </p>
-
-      {/* Lista de escolas */}
+      {/* Lista */}
       {filtered.length === 0 ? (
-        <Card>
-          <CardContent className="p-8 text-center">
-            <School className="w-10 h-10 mx-auto text-muted-foreground/40 mb-3" />
-            <p className="text-sm text-muted-foreground">Nenhuma escola encontrada.</p>
-          </CardContent>
-        </Card>
+        <Card><CardContent className="p-8 text-center">
+          <School className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
+          <p className="text-sm text-muted-foreground">Nenhuma escola encontrada.</p>
+        </CardContent></Card>
       ) : (
         <div className="space-y-1">
-          {filtered.map((escola) => {
-            const isOpen = expandedEscola === escola.escola;
+          {filtered.map((e) => {
+            const open = expandido === `${e.escola}__${e.zona}`;
             return (
-              <div key={escola.escola} className="border border-border/50 rounded-lg overflow-hidden">
+              <div key={`${e.escola}__${e.zona}`} className="border border-border/50 rounded-lg overflow-hidden">
                 <button
-                  onClick={() => setExpandedEscola(isOpen ? null : escola.escola)}
-                  className={cn(
-                    "w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors",
-                    isOpen && "bg-muted/30"
-                  )}
+                  onClick={() => setExpandido(open ? null : `${e.escola}__${e.zona}`)}
+                  className={cn("w-full flex items-center gap-3 p-3 text-left hover:bg-muted/40 transition-colors", open && "bg-muted/30")}
                 >
-                  {isOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+                  {open ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
                   <School className="w-4 h-4 text-primary shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold truncate">{escola.escola}</p>
-                    <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                      {escola.bairro && <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3" />{escola.bairro}</span>}
-                      <span>Zona {escola.zona}</span>
+                    <p className="text-xs font-semibold truncate">{e.escola}</p>
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground flex-wrap">
+                      {e.bairro && <span className="flex items-center gap-0.5"><MapPin className="w-3 h-3" />{e.bairro}</span>}
+                      <span>Zona {e.zona}</span>
+                      <span>{e.secoes} seções</span>
+                      <span>{fmt(e.eleitores)} eleitores</span>
                     </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs font-bold">{escola.totalConvocados.toLocaleString('pt-BR')}</p>
-                    <p className="text-[9px] text-muted-foreground">convocados</p>
+                  <div className="text-right shrink-0 space-y-0.5">
+                    <p className="text-xs font-bold text-primary">{fmt(e.totalConvocados)}</p>
+                    <p className="text-[9px] text-muted-foreground">mesários</p>
                   </div>
                 </button>
 
-                {isOpen && (
-                  <MesariosDetalhe escola={escola} />
-                )}
+                {open && <Detalhe escola={e} />}
               </div>
             );
           })}
@@ -254,46 +254,73 @@ export default function Mesarios() {
   );
 }
 
-/** Detalhe expandido de uma escola — mostra mesários em tabela */
-function MesariosDetalhe({ escola }: { escola: EscolaGroup }) {
-  const { mesarios, funcoesEspeciais } = escola;
+function Detalhe({ escola }: { escola: EscolaGroup }) {
+  const { mesarios, funcoes } = escola;
+  const [tabAtiva, setTabAtiva] = useState<'mesarios' | 'funcoes'>('mesarios');
 
-  if (mesarios.length === 0) {
-    return (
-      <div className="p-4 bg-muted/10 border-t border-border/30">
-        <p className="text-xs text-muted-foreground">Sem dados de mesários para esta zona.</p>
-      </div>
-    );
-  }
+  // Resumos
+  const resumo = useMemo(() => {
+    const total = mesarios.reduce((s, r) => s + (r.qt_convocados || 0), 0);
+    const vol = mesarios.filter(r => r.voluntario === 'S' || r.voluntario === 'SIM').reduce((s, r) => s + (r.qt_convocados || 0), 0);
+    const comp = mesarios.filter(r => r.comparecimento === 'S' || r.comparecimento === 'SIM').reduce((s, r) => s + (r.qt_convocados || 0), 0);
+    return { total, vol, comp };
+  }, [mesarios]);
 
   return (
-    <div className="bg-muted/10 border-t border-border/30 p-4 space-y-4">
+    <div className="bg-muted/10 border-t border-border/30 p-4 space-y-3">
       {escola.endereco && (
         <p className="text-[10px] text-muted-foreground flex items-center gap-1">
           <MapPin className="w-3 h-3" /> {escola.endereco}
         </p>
       )}
 
-      {/* Tabela de mesários */}
-      <div>
-        <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-          👥 Mesários Convocados — Zona {escola.zona} ({mesarios.length} registros)
-        </p>
+      {/* Mini KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
+        <MiniKPI label="Convocados" value={fmt(resumo.total)} />
+        <MiniKPI label="Voluntários" value={fmt(resumo.vol)} accent="text-green-600" />
+        <MiniKPI label="Compareceram" value={fmt(resumo.comp)} accent="text-primary" />
+        <MiniKPI label="Eleitores" value={fmt(escola.eleitores)} />
+        <MiniKPI label="Funções Esp." value={fmt(escola.totalFuncoes)} />
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1">
+        <button
+          onClick={() => setTabAtiva('mesarios')}
+          className={cn("px-3 py-1 rounded-md text-[10px] font-medium transition-colors",
+            tabAtiva === 'mesarios' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+          )}
+        >
+          Mesários ({mesarios.length})
+        </button>
+        {funcoes.length > 0 && (
+          <button
+            onClick={() => setTabAtiva('funcoes')}
+            className={cn("px-3 py-1 rounded-md text-[10px] font-medium transition-colors",
+              tabAtiva === 'funcoes' ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
+            )}
+          >
+            Funções Especiais ({funcoes.length})
+          </button>
+        )}
+      </div>
+
+      {tabAtiva === 'mesarios' && mesarios.length > 0 && (
         <div className="overflow-x-auto rounded-lg border border-border/30 max-h-[400px] overflow-y-auto">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/30 hover:bg-muted/30">
-                <TableHead className="text-[10px] whitespace-nowrap">Turno</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Tipo</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Atividade</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Gênero</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Faixa Etária</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Instrução</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Cor/Raça</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Estado Civil</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Voluntário</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap">Compareceu</TableHead>
-                <TableHead className="text-[10px] whitespace-nowrap text-right">Qtd</TableHead>
+                <TableHead className="text-[10px]">Turno</TableHead>
+                <TableHead className="text-[10px]">Tipo</TableHead>
+                <TableHead className="text-[10px]">Atividade</TableHead>
+                <TableHead className="text-[10px]">Gênero</TableHead>
+                <TableHead className="text-[10px]">Faixa Etária</TableHead>
+                <TableHead className="text-[10px]">Instrução</TableHead>
+                <TableHead className="text-[10px]">Cor/Raça</TableHead>
+                <TableHead className="text-[10px]">Estado Civil</TableHead>
+                <TableHead className="text-[10px]">Voluntário</TableHead>
+                <TableHead className="text-[10px]">Compareceu</TableHead>
+                <TableHead className="text-[10px] text-right">Qtd</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -301,107 +328,82 @@ function MesariosDetalhe({ escola }: { escola: EscolaGroup }) {
                 <TableRow key={i} className="border-border/20">
                   <TableCell className="text-xs">{m.turno || '-'}</TableCell>
                   <TableCell className="text-xs">{m.tipo_mesario || '-'}</TableCell>
-                  <TableCell className="text-xs max-w-[150px] truncate">{m.atividade_eleitoral || '-'}</TableCell>
+                  <TableCell className="text-xs max-w-[140px] truncate">{m.atividade_eleitoral || '-'}</TableCell>
                   <TableCell className="text-xs">{m.genero || '-'}</TableCell>
                   <TableCell className="text-xs">{m.faixa_etaria || '-'}</TableCell>
-                  <TableCell className="text-xs max-w-[120px] truncate">{m.grau_instrucao || '-'}</TableCell>
+                  <TableCell className="text-xs max-w-[110px] truncate">{m.grau_instrucao || '-'}</TableCell>
                   <TableCell className="text-xs">{m.cor_raca || '-'}</TableCell>
                   <TableCell className="text-xs">{m.estado_civil || '-'}</TableCell>
                   <TableCell className="text-xs">
-                    <Badge variant={m.voluntario === 'S' || m.voluntario === 'SIM' ? 'default' : 'outline'} className="text-[8px] h-4">
-                      {m.voluntario === 'S' || m.voluntario === 'SIM' ? 'Sim' : 'Não'}
-                    </Badge>
+                    <SimNao val={m.voluntario} />
                   </TableCell>
                   <TableCell className="text-xs">
-                    <Badge variant={m.comparecimento === 'S' || m.comparecimento === 'SIM' ? 'default' : 'secondary'} className="text-[8px] h-4">
-                      {m.comparecimento === 'S' || m.comparecimento === 'SIM' ? 'Sim' : 'Não'}
-                    </Badge>
+                    <SimNao val={m.comparecimento} />
                   </TableCell>
-                  <TableCell className="text-xs text-right font-bold">{(m.qt_convocados || 0).toLocaleString('pt-BR')}</TableCell>
+                  <TableCell className="text-xs text-right font-bold">{fmt(m.qt_convocados || 0)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
-      </div>
+      )}
 
-      {/* Funções especiais */}
-      {funcoesEspeciais.length > 0 && (
-        <div>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">
-            ⭐ Funções Especiais — Zona {escola.zona} ({funcoesEspeciais.length} registros)
-          </p>
-          <div className="overflow-x-auto rounded-lg border border-border/30 max-h-[300px] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/30 hover:bg-muted/30">
-                  <TableHead className="text-[10px] whitespace-nowrap">Função</TableHead>
-                  <TableHead className="text-[10px] whitespace-nowrap">Turno</TableHead>
-                  <TableHead className="text-[10px] whitespace-nowrap">Gênero</TableHead>
-                  <TableHead className="text-[10px] whitespace-nowrap">Faixa Etária</TableHead>
-                  <TableHead className="text-[10px] whitespace-nowrap">Instrução</TableHead>
-                  <TableHead className="text-[10px] whitespace-nowrap">Cor/Raça</TableHead>
-                  <TableHead className="text-[10px] whitespace-nowrap">Voluntário</TableHead>
-                  <TableHead className="text-[10px] whitespace-nowrap">Compareceu</TableHead>
-                  <TableHead className="text-[10px] whitespace-nowrap text-right">Qtd</TableHead>
+      {tabAtiva === 'funcoes' && funcoes.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-border/30 max-h-[400px] overflow-y-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/30 hover:bg-muted/30">
+                <TableHead className="text-[10px]">Função</TableHead>
+                <TableHead className="text-[10px]">Turno</TableHead>
+                <TableHead className="text-[10px]">Gênero</TableHead>
+                <TableHead className="text-[10px]">Faixa Etária</TableHead>
+                <TableHead className="text-[10px]">Instrução</TableHead>
+                <TableHead className="text-[10px]">Cor/Raça</TableHead>
+                <TableHead className="text-[10px]">Voluntário</TableHead>
+                <TableHead className="text-[10px]">Compareceu</TableHead>
+                <TableHead className="text-[10px] text-right">Qtd</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {funcoes.map((f: any, i: number) => (
+                <TableRow key={i} className="border-border/20">
+                  <TableCell className="text-xs font-medium">{f.funcao_especial || '-'}</TableCell>
+                  <TableCell className="text-xs">{f.turno || '-'}</TableCell>
+                  <TableCell className="text-xs">{f.genero || '-'}</TableCell>
+                  <TableCell className="text-xs">{f.faixa_etaria || '-'}</TableCell>
+                  <TableCell className="text-xs max-w-[110px] truncate">{f.grau_instrucao || '-'}</TableCell>
+                  <TableCell className="text-xs">{f.cor_raca || '-'}</TableCell>
+                  <TableCell className="text-xs"><SimNao val={f.voluntario} /></TableCell>
+                  <TableCell className="text-xs"><SimNao val={f.comparecimento} /></TableCell>
+                  <TableCell className="text-xs text-right font-bold">{fmt(f.qt_convocados || 0)}</TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {funcoesEspeciais.map((f: any, i: number) => (
-                  <TableRow key={i} className="border-border/20">
-                    <TableCell className="text-xs font-medium">{f.funcao_especial || '-'}</TableCell>
-                    <TableCell className="text-xs">{f.turno || '-'}</TableCell>
-                    <TableCell className="text-xs">{f.genero || '-'}</TableCell>
-                    <TableCell className="text-xs">{f.faixa_etaria || '-'}</TableCell>
-                    <TableCell className="text-xs max-w-[120px] truncate">{f.grau_instrucao || '-'}</TableCell>
-                    <TableCell className="text-xs">{f.cor_raca || '-'}</TableCell>
-                    <TableCell className="text-xs">
-                      <Badge variant={f.voluntario === 'S' || f.voluntario === 'SIM' ? 'default' : 'outline'} className="text-[8px] h-4">
-                        {f.voluntario === 'S' || f.voluntario === 'SIM' ? 'Sim' : 'Não'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <Badge variant={f.comparecimento === 'S' || f.comparecimento === 'SIM' ? 'default' : 'secondary'} className="text-[8px] h-4">
-                        {f.comparecimento === 'S' || f.comparecimento === 'SIM' ? 'Sim' : 'Não'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-right font-bold">{(f.qt_convocados || 0).toLocaleString('pt-BR')}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 
-      {/* Resumo rápido */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        {(() => {
-          const total = mesarios.reduce((s: number, r: any) => s + (r.qt_convocados || 0), 0);
-          const vol = mesarios.filter((r: any) => r.voluntario === 'S' || r.voluntario === 'SIM').reduce((s: number, r: any) => s + (r.qt_convocados || 0), 0);
-          const comp = mesarios.filter((r: any) => r.comparecimento === 'S' || r.comparecimento === 'SIM').reduce((s: number, r: any) => s + (r.qt_convocados || 0), 0);
-          return (
-            <>
-              <div className="bg-card rounded-lg border border-border/40 p-2 text-center">
-                <p className="text-[9px] text-muted-foreground">Total</p>
-                <p className="text-sm font-bold">{total.toLocaleString('pt-BR')}</p>
-              </div>
-              <div className="bg-card rounded-lg border border-border/40 p-2 text-center">
-                <p className="text-[9px] text-muted-foreground">Voluntários</p>
-                <p className="text-sm font-bold text-green-600">{vol.toLocaleString('pt-BR')}</p>
-              </div>
-              <div className="bg-card rounded-lg border border-border/40 p-2 text-center">
-                <p className="text-[9px] text-muted-foreground">Compareceram</p>
-                <p className="text-sm font-bold text-primary">{comp.toLocaleString('pt-BR')}</p>
-              </div>
-              <div className="bg-card rounded-lg border border-border/40 p-2 text-center">
-                <p className="text-[9px] text-muted-foreground">Eleitores</p>
-                <p className="text-sm font-bold">{escola.eleitores.toLocaleString('pt-BR')}</p>
-              </div>
-            </>
-          );
-        })()}
-      </div>
+      {mesarios.length === 0 && (
+        <p className="text-xs text-muted-foreground">Sem dados de mesários para esta zona.</p>
+      )}
     </div>
+  );
+}
+
+function MiniKPI({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  return (
+    <div className="bg-card rounded-lg border border-border/40 p-2 text-center">
+      <p className="text-[9px] text-muted-foreground">{label}</p>
+      <p className={cn("text-sm font-bold", accent || "text-foreground")}>{value}</p>
+    </div>
+  );
+}
+
+function SimNao({ val }: { val: string | null }) {
+  const sim = val === 'S' || val === 'SIM';
+  return (
+    <Badge variant={sim ? 'default' : 'outline'} className="text-[8px] h-4">
+      {sim ? 'Sim' : 'Não'}
+    </Badge>
   );
 }
