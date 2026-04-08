@@ -67,12 +67,6 @@ export function AppSidebar() {
             <SidebarMenu>{mainItems.map(item => <MenuItem key={item.url} item={item} />)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-        <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-[10px] text-sidebar-foreground/30 uppercase tracking-widest px-3 mb-1 mt-4">Sistema</SidebarGroupLabel>}
-          <SidebarGroupContent>
-            <SidebarMenu>{systemItems.map(item => <MenuItem key={item.url} item={item} />)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
     </Sidebar>
   );
