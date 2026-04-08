@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { useFilterStore } from '@/stores/filterStore';
+import { mdQuery, getTableName, getAnosDisponiveis } from '@/lib/motherduck';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -18,21 +18,39 @@ function useCandidatos() {
   const zona = useFilterStore((s) => s.zona);
 
   return useQuery({
-    queryKey: ['candidatos-lista', ano, municipio, cargo, partido, zona],
+    queryKey: ['candidatos-md', ano, municipio, cargo, partido, zona],
     queryFn: async () => {
-      let q = supabase
-        .from('bd_eleicoes_candidatos')
-        .select('*')
-        .eq('ano', ano)
-        .eq('municipio', municipio);
+      if (!getAnosDisponiveis('candidatos').includes(ano)) return [];
+      const tab = getTableName('candidatos', ano);
+      const conds: string[] = [
+        `SG_UF = 'GO'`,
+        `NM_MUNICIPIO = '${municipio}'`,
+        `NR_TURNO = 1`,
+      ];
+      if (cargo) conds.push(`DS_CARGO = '${cargo}'`);
+      if (partido) conds.push(`SG_PARTIDO = '${partido}'`);
+      if (zona) conds.push(`NR_ZONA = ${zona}`);
 
-      if (cargo) q = q.eq('cargo', cargo);
-      if (partido) q = q.eq('sigla_partido', partido);
-      if (zona) q = q.eq('zona', zona);
-
-      const { data, error } = await q.order('nome_urna');
-      if (error) throw error;
-      return data || [];
+      const rows = await mdQuery<any>(`
+        SELECT
+          SQ_CANDIDATO AS id,
+          NM_CANDIDATO AS nome_completo,
+          NM_URNA_CANDIDATO AS nome_urna,
+          DS_CARGO AS cargo,
+          NR_CANDIDATO AS numero_urna,
+          SG_PARTIDO AS sigla_partido,
+          DS_SIT_TOT_TURNO AS situacao_final,
+          DS_GRAU_INSTRUCAO AS grau_instrucao,
+          DS_GENERO AS genero,
+          DS_COR_RACA AS cor_raca,
+          DS_OCUPACAO AS ocupacao,
+          DT_NASCIMENTO AS data_nascimento,
+          NM_PARTIDO AS nome_partido
+        FROM ${tab}
+        WHERE ${conds.join(' AND ')}
+        ORDER BY NM_URNA_CANDIDATO
+      `);
+      return rows;
     },
     enabled: !!municipio,
     staleTime: 5 * 60_000,
@@ -40,7 +58,7 @@ function useCandidatos() {
 }
 
 export default function PerfilCandidatos() {
-  const { data: candidatos, isLoading } = useCandidatos();
+  const { data: candidatos, isLoading, isError } = useCandidatos();
   const { municipio, ano } = useFilterStore();
   const [busca, setBusca] = useState('');
 
@@ -64,7 +82,6 @@ export default function PerfilCandidatos() {
       if (!map.has(cargo)) map.set(cargo, []);
       map.get(cargo)!.push(c);
     }
-    // Ordena: Prefeito primeiro, depois Vereador, depois o resto
     const order = ['PREFEITO', 'VICE-PREFEITO', 'VEREADOR'];
     return Array.from(map.entries()).sort((a, b) => {
       const ia = order.indexOf(a[0].toUpperCase());
@@ -88,12 +105,24 @@ export default function PerfilCandidatos() {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="space-y-3">
+        <h1 className="text-lg font-bold text-foreground">Perfil de Candidatos</h1>
+        <Card><CardContent className="p-8 text-center">
+          <User className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
+          <p className="text-sm text-muted-foreground">Erro ao carregar candidatos. Tente novamente.</p>
+        </CardContent></Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-lg font-bold text-foreground">Perfil de Candidatos</h1>
-          <p className="text-xs text-muted-foreground">{municipio} — {ano} • Fonte: TSE</p>
+          <p className="text-xs text-muted-foreground">{municipio} — {ano} • Fonte: TSE / MotherDuck</p>
         </div>
         <Badge variant="secondary" className="text-[10px]">
           {filtered.length} candidatos
@@ -163,20 +192,15 @@ function calcIdade(nasc: string | null): number | null {
 
 function CandidatoCard({ c }: { c: any }) {
   const idade = calcIdade(c.data_nascimento);
-  const seqId = c.sequencial_candidato || c.id;
 
   return (
-    <Link to={`/candidato/${seqId}`} className="block">
+    <Link to={`/candidato/${c.id}`} className="block">
       <Card className="border-border/50 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
         <CardContent className="p-3">
           <div className="flex items-start gap-3">
-            {c.foto_url ? (
-              <img src={c.foto_url} alt={c.nome_urna} className="w-10 h-10 rounded-full object-cover shrink-0 border border-border/50" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-                <User className="w-5 h-5 text-primary" />
-              </div>
-            )}
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+              <User className="w-5 h-5 text-primary" />
+            </div>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1">
