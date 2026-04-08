@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 
 const mainItems = [
   { title: 'Dados Eleitorais', url: '/', icon: Trophy },
+  { title: 'Perfil de Candidatos', url: '/candidatos', icon: User },
   { title: 'Zonas Eleitorais', url: '/zonas', icon: Hash },
   { title: 'Escolas Eleitorais', url: '/escolas', icon: School },
   { title: 'Mesários', url: '/mesarios', icon: Users },
