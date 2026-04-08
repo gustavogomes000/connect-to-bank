@@ -13,6 +13,7 @@ import ChatEleicoes from "./pages/ChatEleicoes";
 import CandidatoPerfil from "./pages/CandidatoPerfil";
 import Configuracoes from "./pages/Configuracoes";
 import Ajuda from "./pages/Ajuda";
+import Mesarios from "./pages/Mesarios";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +43,7 @@ function Layout() {
               <Route path="/ranking" element={<Ranking />} />
               <Route path="/zonas" element={<ZonasEleitorais />} />
               <Route path="/escolas" element={<EscolasEleitorais />} />
+              <Route path="/mesarios" element={<Mesarios />} />
               <Route path="/chat" element={<ChatEleicoes />} />
               <Route path="/relatorios" element={<ChatEleicoes />} />
               <Route path="/candidato/:id" element={<CandidatoPerfil />} />
