@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { usePainelGeral, useKPIs, useComparecimento } from '@/hooks/useEleicoes';
+import { usePainelGeral, useKPIs, useComparecimento, useVotosRegional } from '@/hooks/useEleicoes';
 import { useFilterStore } from '@/stores/filterStore';
 import { formatNumber, formatPercent, getPartidoCor } from '@/lib/eleicoes';
 import { SituacaoBadge } from '@/components/eleicoes/SituacaoBadge';
