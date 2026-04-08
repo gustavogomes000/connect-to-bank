@@ -16,9 +16,6 @@ const mainItems = [
   { title: 'Converse com a IA', url: '/chat', icon: MessageSquare },
 ];
 
-const systemItems = [
-  { title: 'Configurações', url: '/config', icon: Settings },
-];
 
 export function AppSidebar() {
   const location = useLocation();
@@ -68,12 +65,6 @@ export function AppSidebar() {
           {!collapsed && <SidebarGroupLabel className="text-[10px] text-sidebar-foreground/30 uppercase tracking-widest px-3 mb-1">Módulos</SidebarGroupLabel>}
           <SidebarGroupContent>
             <SidebarMenu>{mainItems.map(item => <MenuItem key={item.url} item={item} />)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        <SidebarGroup>
-          {!collapsed && <SidebarGroupLabel className="text-[10px] text-sidebar-foreground/30 uppercase tracking-widest px-3 mb-1 mt-4">Sistema</SidebarGroupLabel>}
-          <SidebarGroupContent>
-            <SidebarMenu>{systemItems.map(item => <MenuItem key={item.url} item={item} />)}</SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
