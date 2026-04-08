@@ -317,6 +317,30 @@ export default function CandidatoPerfil() {
     },
   });
 
+  // ── Composição detalhada de votos (boletim_urna + eleitorado_local) ──
+  // Precisa do NR_CANDIDATO (numero de urna) — disponível após candidatoQ
+  const nrCandidato = candidatoQ.data?.row?.NR_CANDIDATO || candidatoQ.data?.row?.NR_URNA_CANDIDATO || null;
+
+  const composicaoGoianiaQ = useQuery({
+    queryKey: ['md', 'composicao_votos_goiania', ano, nrCandidato],
+    enabled: !!nrCandidato && canUseDataset('boletim_urna', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const rows = await mdQuery(sqlComposicaoVotosCandidato(ano, nrCandidato!, 'GOIÂNIA'));
+      return rows as AnyRow[];
+    },
+  });
+
+  const composicaoAparecidaQ = useQuery({
+    queryKey: ['md', 'composicao_votos_aparecida', ano, nrCandidato],
+    enabled: !!nrCandidato && canUseDataset('boletim_urna', ano),
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      const rows = await mdQuery(sqlComposicaoVotosCandidato(ano, nrCandidato!, 'APARECIDA DE GOIÂNIA'));
+      return rows as AnyRow[];
+    },
+  });
+
   const candidato = candidatoQ.data?.row;
   const complementar = complementarQ.data?.row;
   const bens = bensQ.data?.rows || [];
@@ -332,6 +356,11 @@ export default function CandidatoPerfil() {
   const votacaoRows = useMemo(
     () => [...(votacaoTerritorialQ.data || []), ...(votacaoTerritorialAparecidaQ.data || [])],
     [votacaoTerritorialQ.data, votacaoTerritorialAparecidaQ.data],
+  );
+
+  const composicaoRows = useMemo(
+    () => [...(composicaoGoianiaQ.data || []), ...(composicaoAparecidaQ.data || [])],
+    [composicaoGoianiaQ.data, composicaoAparecidaQ.data],
   );
 
   const geo = useMemo(() => aggregateVotos(votacaoRows), [votacaoRows]);
