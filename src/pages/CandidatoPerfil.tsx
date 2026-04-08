@@ -314,7 +314,6 @@ export default function CandidatoPerfil() {
       const rows = await mdQuery(sqlVotacaoTerritorialDetalhada(ano, String(sq), { municipio: 'APARECIDA DE GOIÂNIA' } as any));
       return rows as AnyRow[];
     },
-    },
   });
 
   const candidato = candidatoQ.data?.row;
