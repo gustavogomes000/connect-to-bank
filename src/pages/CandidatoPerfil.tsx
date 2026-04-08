@@ -2,6 +2,7 @@ import { useParams, Link } from 'react-router-dom';
 import { useDossieCandidato, useHistoricoCandidato, useEvolucaoPatrimonio } from '@/hooks/useEleicoes';
 import { formatNumber, formatPercent, formatBRL, formatBRLCompact, getPartidoCor, getAvatarColor, getInitial } from '@/lib/eleicoes';
 import { SituacaoBadge } from '@/components/eleicoes/SituacaoBadge';
+import { GeoFilterBadge } from '@/components/eleicoes/GeoFilterBadge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -129,7 +130,7 @@ export default function CandidatoPerfil() {
   const { ano } = useFilterStore();
 
   const {
-    perfil, bens, patrimonio, votacaoZona,
+    perfil, bens, patrimonio, votacaoZona, votacaoTerritorial,
     isLoading, error,
   } = useDossieCandidato(id || null, ano);
 
