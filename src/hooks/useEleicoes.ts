@@ -10,6 +10,7 @@ import {
   sqlPatrimonioCandidato,
   sqlVotacaoPorZona,
   sqlVotacaoTerritorialDetalhada,
+  sqlVotosRegional,
   sqlHistoricoCandidato,
   sqlRankingPatrimonio,
   sqlComparecimento,
