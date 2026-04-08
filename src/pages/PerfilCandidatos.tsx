@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Search, User, Landmark, GraduationCap, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { traduzirSituacao } from '@/lib/eleicoes';
 
 function useCandidatos() {
   const ano = useFilterStore((s) => s.ano);
@@ -219,7 +220,7 @@ function CandidatoCard({ c }: { c: any }) {
                 <span className="text-[10px] text-muted-foreground font-mono">Nº {c.numero_urna}</span>
                 {c.situacao_final && (
                   <Badge className={cn("text-[8px] h-4 border", getSitColor(c.situacao_final))}>
-                    {c.situacao_final}
+                    {traduzirSituacao(c.situacao_final)}
                   </Badge>
                 )}
               </div>
