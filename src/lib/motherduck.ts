@@ -135,7 +135,9 @@ function buildGeoJoin(f: FiltrosPainel, votAlias = 'v', locAlias = 'loc'): { joi
 
 function buildWhereClause(filtros: FiltrosPainel, campoMunicipio = 'NM_UE'): string {
   const conds: string[] = [];
-  if (filtros.municipio) conds.push(`${campoMunicipio} = '${filtros.municipio}'`);
+  const ano = filtros.ano || 2024;
+  // For general elections, don't filter candidate origin by municipality
+  if (filtros.municipio && !isEleicaoGeral(ano)) conds.push(`${campoMunicipio} = '${filtros.municipio}'`);
   if (filtros.cargo) conds.push(`DS_CARGO ILIKE '%${filtros.cargo}%'`);
   if (filtros.partido) conds.push(`SG_PARTIDO = '${filtros.partido}'`);
   if (filtros.turno) conds.push(`NR_TURNO = ${filtros.turno}`);
