@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useVotosPorBairro, useVotosPorLocal, useMunicipios, useDataAvailability } from '@/hooks/useEleicoes';
+import { useComparecimentoPorBairro, useVotosPorLocal, useMunicipios, useDataAvailability } from '@/hooks/useEleicoes';
 import { formatNumber, formatPercent } from '@/lib/eleicoes';
 import { ANOS_DISPONIVEIS } from '@/lib/eleicoes';
 import { KPISkeleton, TableSkeleton } from '@/components/eleicoes/Skeletons';
@@ -29,7 +29,7 @@ export default function AnaliseBairro() {
 
   const hasSecaoData = availability?.comparecimentoSecao;
 
-  const { data: bairros, isLoading: loadingBairros } = useVotosPorBairro(selected, anoFiltro || undefined);
+  const { data: bairros, isLoading: loadingBairros } = useComparecimentoPorBairro(selected, anoFiltro || undefined);
   const { data: locais, isLoading: loadingLocais } = useVotosPorLocal(selected, anoFiltro || undefined, bairroSelecionado || undefined);
 
   const chartData = (bairros || []).slice(0, 15).map(b => ({
