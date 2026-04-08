@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useFilterStore } from '@/stores/filterStore';
-import { mdQuery, getTableName, getAnosDisponiveis } from '@/lib/motherduck';
+import { mdQuery, getTableName, getAnosDisponiveis, isEleicaoGeral } from '@/lib/motherduck';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -11,46 +11,66 @@ import { Search, User, Landmark, GraduationCap, ChevronRight } from 'lucide-reac
 import { cn } from '@/lib/utils';
 import { traduzirSituacao } from '@/lib/eleicoes';
 
+/**
+ * Busca candidatos de TODOS os anos (2014-2024) via UNION ALL.
+ * Para eleições gerais (2014,2018,2022), não filtra por município na tabela de candidatos.
+ * Deduplica por nome completo, mantendo a entrada mais recente.
+ */
 function useCandidatos() {
-  const ano = useFilterStore((s) => s.ano);
   const municipio = useFilterStore((s) => s.municipio);
   const cargo = useFilterStore((s) => s.cargo);
   const partido = useFilterStore((s) => s.partido);
-  const zona = useFilterStore((s) => s.zona);
 
   return useQuery({
-    queryKey: ['candidatos-md', ano, municipio, cargo, partido, zona],
+    queryKey: ['candidatos-md-todos', municipio, cargo, partido],
     queryFn: async () => {
-      if (!getAnosDisponiveis('candidatos').includes(ano)) return [];
-      const tab = getTableName('candidatos', ano);
-      const conds: string[] = [
-        `SG_UF = 'GO'`,
-        `NM_UE = '${municipio}'`,
-        `NR_TURNO = 1`,
-      ];
-      if (cargo) conds.push(`DS_CARGO = '${cargo}'`);
-      if (partido) conds.push(`SG_PARTIDO = '${partido}'`);
-      if (zona) conds.push(`NR_ZONA = ${zona}`);
+      const anos = getAnosDisponiveis('candidatos'); // [2014,2016,2018,2020,2022,2024]
+      const unions: string[] = [];
 
-      const rows = await mdQuery<any>(`
-        SELECT
-          SQ_CANDIDATO AS id,
-          NM_CANDIDATO AS nome_completo,
-          NM_URNA_CANDIDATO AS nome_urna,
-          DS_CARGO AS cargo,
-          NR_CANDIDATO AS numero_urna,
-          SG_PARTIDO AS sigla_partido,
-          DS_SIT_TOT_TURNO AS situacao_final,
-          DS_GRAU_INSTRUCAO AS grau_instrucao,
-          DS_GENERO AS genero,
-          DS_COR_RACA AS cor_raca,
-          DS_OCUPACAO AS ocupacao,
-          DT_NASCIMENTO AS data_nascimento,
-          NM_PARTIDO AS nome_partido
-        FROM ${tab}
-        WHERE ${conds.join(' AND ')}
-        ORDER BY NM_URNA_CANDIDATO
-      `);
+      for (const ano of anos) {
+        const tab = getTableName('candidatos', ano);
+        const geral = isEleicaoGeral(ano);
+        const conds: string[] = [`SG_UF = 'GO'`];
+
+        // Eleições municipais: filtrar por município. Gerais: não filtrar.
+        if (!geral) conds.push(`NM_UE = '${municipio}'`);
+        conds.push(`NR_TURNO = 1`);
+        if (cargo) conds.push(`DS_CARGO = '${cargo}'`);
+        if (partido) conds.push(`SG_PARTIDO = '${partido}'`);
+
+        unions.push(`
+          SELECT
+            SQ_CANDIDATO AS id,
+            NM_CANDIDATO AS nome_completo,
+            NM_URNA_CANDIDATO AS nome_urna,
+            DS_CARGO AS cargo,
+            NR_CANDIDATO AS numero_urna,
+            SG_PARTIDO AS sigla_partido,
+            DS_SIT_TOT_TURNO AS situacao_final,
+            DS_GRAU_INSTRUCAO AS grau_instrucao,
+            DS_GENERO AS genero,
+            DS_COR_RACA AS cor_raca,
+            DS_OCUPACAO AS ocupacao,
+            DT_NASCIMENTO AS data_nascimento,
+            NM_PARTIDO AS nome_partido,
+            ${ano} AS ano_eleicao
+          FROM ${tab}
+          WHERE ${conds.join(' AND ')}
+        `);
+      }
+
+      const sql = `
+        WITH todos AS (${unions.join(' UNION ALL ')})
+        SELECT DISTINCT ON (nome_completo) *
+        FROM (
+          SELECT *, ROW_NUMBER() OVER (PARTITION BY nome_completo ORDER BY ano_eleicao DESC) AS rn
+          FROM todos
+        )
+        WHERE rn = 1
+        ORDER BY nome_urna
+      `;
+
+      const rows = await mdQuery<any>(sql);
       return rows;
     },
     enabled: !!municipio,
@@ -60,7 +80,7 @@ function useCandidatos() {
 
 export default function PerfilCandidatos() {
   const { data: candidatos, isLoading, isError } = useCandidatos();
-  const { municipio, ano } = useFilterStore();
+  const { municipio } = useFilterStore();
   const [busca, setBusca] = useState('');
 
   const filtered = useMemo(() => {
@@ -83,7 +103,7 @@ export default function PerfilCandidatos() {
       if (!map.has(cargo)) map.set(cargo, []);
       map.get(cargo)!.push(c);
     }
-    const order = ['PREFEITO', 'VICE-PREFEITO', 'VEREADOR'];
+    const order = ['PREFEITO', 'VICE-PREFEITO', 'VEREADOR', 'DEPUTADO ESTADUAL', 'DEPUTADO FEDERAL', 'SENADOR', 'GOVERNADOR'];
     return Array.from(map.entries()).sort((a, b) => {
       const ia = order.indexOf(a[0].toUpperCase());
       const ib = order.indexOf(b[0].toUpperCase());
@@ -109,7 +129,7 @@ export default function PerfilCandidatos() {
   if (isError) {
     return (
       <div className="space-y-3">
-        <h1 className="text-lg font-bold text-foreground">Perfil de Candidatos</h1>
+        <h1 className="text-lg font-bold text-foreground">Painel de Candidatos</h1>
         <Card><CardContent className="p-8 text-center">
           <User className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
           <p className="text-sm text-muted-foreground">Erro ao carregar candidatos. Tente novamente.</p>
@@ -122,8 +142,8 @@ export default function PerfilCandidatos() {
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="text-lg font-bold text-foreground">Perfil de Candidatos</h1>
-          <p className="text-xs text-muted-foreground">{municipio} — {ano} • Fonte: TSE / MotherDuck</p>
+          <h1 className="text-lg font-bold text-foreground">Painel de Candidatos</h1>
+          <p className="text-xs text-muted-foreground">{municipio} — Todos os anos (2014–2024) • Fonte: TSE / MotherDuck</p>
         </div>
         <Badge variant="secondary" className="text-[10px]">
           {filtered.length} candidatos
@@ -156,7 +176,7 @@ export default function PerfilCandidatos() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                 {lista.map((c: any) => (
-                  <CandidatoCard key={c.id} c={c} />
+                  <CandidatoCard key={`${c.id}-${c.ano_eleicao}`} c={c} />
                 ))}
               </div>
             </div>
@@ -218,6 +238,9 @@ function CandidatoCard({ c }: { c: any }) {
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <Badge variant="outline" className="text-[9px] h-4 font-bold">{c.sigla_partido}</Badge>
                 <span className="text-[10px] text-muted-foreground font-mono">Nº {c.numero_urna}</span>
+                {c.ano_eleicao && (
+                  <Badge variant="outline" className="text-[8px] h-4 font-mono">{c.ano_eleicao}</Badge>
+                )}
                 {c.situacao_final && (
                   <Badge className={cn("text-[8px] h-4 border", getSitColor(c.situacao_final))}>
                     {traduzirSituacao(c.situacao_final)}
