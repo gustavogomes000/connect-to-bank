@@ -326,6 +326,30 @@ function HistoricoEleitoral({ historico, currentAno }: { historico: AnyRow[]; cu
     }
   }, [expandedYear, zonasData]);
 
+  const handleExpandZona = useCallback(async (ano: number, zonaNum: number, nrCandidato: string | number, municipio: string) => {
+    const key = `${ano}-${zonaNum}`;
+    if (expandedZona === key) {
+      setExpandedZona(null);
+      return;
+    }
+    setExpandedZona(key);
+    if (locaisData[key]) return;
+    const hasBU = getAnosDisponiveis('boletim_urna').includes(ano);
+    if (!hasBU) {
+      setLocaisData(prev => ({ ...prev, [key]: [] }));
+      return;
+    }
+    setLoadingLocais(key);
+    try {
+      const rows = await mdQuery(sqlVotosHistoricoPorLocal(ano, nrCandidato, zonaNum, municipio));
+      setLocaisData(prev => ({ ...prev, [key]: rows }));
+    } catch {
+      setLocaisData(prev => ({ ...prev, [key]: [] }));
+    } finally {
+      setLoadingLocais(null);
+    }
+  }, [expandedZona, locaisData]);
+
   return (
     <section className="bg-white rounded-xl border border-border p-4 space-y-3">
       <div className="flex items-center gap-2 flex-wrap">
