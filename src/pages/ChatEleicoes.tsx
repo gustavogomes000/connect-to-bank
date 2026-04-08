@@ -5,7 +5,7 @@ import { formatNumber } from '@/lib/eleicoes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import DynamicChart from '@/components/eleicoes/DynamicChart';
+import DynamicChartRenderer from '@/components/eleicoes/DynamicChartRenderer';
 import {
   MessageSquare, Send, Loader2, Code2, Trash2, Database,
   Lightbulb, BarChart3, Star, Bookmark, X, AlertTriangle,
@@ -76,7 +76,7 @@ function MessageBubble({ message, onSalvar, isSalvo }: { message: ChatMessage; o
                     {message.resultado.sql_gerado}
                   </pre>
                 )}
-                <DynamicChart
+                <DynamicChartRenderer
                   configVisual={message.resultado.config_visual}
                   dadosBrutos={message.resultado.dados_brutos}
                   colunas={message.resultado.colunas}
@@ -181,18 +181,17 @@ function FavoritosPanel({ onUsar, onFechar }: { onUsar: (p: string) => void; onF
 
 // ── MAIN ──
 const SUGESTOES_RAPIDAS = [
-  "Top 10 vereadores mais votados em Goiânia 2024",
-  "Resumo geral da eleição de 2024",
-  "Distribuição de gênero dos candidatos 2024",
   "Comparar PT e PL para vereador em Goiânia 2024",
   "Evolução do comparecimento em Goiânia",
+  "Top 10 vereadores mais votados em Goiânia 2024",
+  "Abstenção por zona eleitoral em Goiânia 2024",
+];
+
+const SUGESTOES_EXTRAS = [
+  "Distribuição de gênero dos candidatos 2024",
   "Candidatos com maior patrimônio em 2024",
-  "Escolaridade dos candidatos a prefeito 2024",
-  "Abstenção por município em 2024",
   "Ranking de partidos em Aparecida de Goiânia 2024",
   "Votos por zona eleitoral em Goiânia 2024",
-  "Ocupações mais comuns dos vereadores 2024",
-  "Bairros com maior comparecimento em Goiânia 2024",
 ];
 
 export default function ChatEleicoes() {
@@ -311,7 +310,7 @@ export default function ChatEleicoes() {
               <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold">Experimente perguntar</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-w-lg w-full">
-              {SUGESTOES_RAPIDAS.map((s, i) => (
+              {[...SUGESTOES_RAPIDAS, ...SUGESTOES_EXTRAS].map((s, i) => (
                 <button
                   key={i}
                   onClick={() => handleSend(s)}
@@ -363,6 +362,22 @@ export default function ChatEleicoes() {
             </p>
           </div>
         )}
+
+        {/* Quick suggestion chips above input */}
+        {!isEmpty && !loading && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {SUGESTOES_RAPIDAS.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => handleSend(s)}
+                className="text-[10px] px-2.5 py-1 rounded-full border border-border/30 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-2 items-end">
           <div className="flex-1 relative">
             <Textarea
