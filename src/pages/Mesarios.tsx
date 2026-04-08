@@ -103,30 +103,11 @@ export default function Mesarios() {
   const [expandido, setExpandido] = useState<string | null>(null);
 
   const escolas = useMemo(() => {
-    if (!locais) return [];
-
-    // Agrupa locais por escola
-    const map = new Map<string, { escola: string; bairro: string; endereco: string; zona: number; eleitores: number; secoes: Set<number> }>();
-    for (const l of locais) {
-      const key = `${l.local_votacao || 'Zona ' + l.zona}__${l.zona}`;
-      if (!map.has(key)) {
-        map.set(key, {
-          escola: l.local_votacao || `Zona ${l.zona}`,
-          bairro: l.bairro || '',
-          endereco: l.endereco_local || '',
-          zona: l.zona || 0,
-          eleitores: 0,
-          secoes: new Set(),
-        });
-      }
-      const e = map.get(key)!;
-      e.eleitores += l.eleitorado_apto || 0;
-      if (l.secao) e.secoes.add(l.secao);
-    }
+    if (!mesarios) return [];
 
     // Indexa mesários e funções por zona
     const mesPorZona = new Map<number, any[]>();
-    for (const m of (mesarios || [])) {
+    for (const m of mesarios) {
       const z = m.zona || 0;
       if (!mesPorZona.has(z)) mesPorZona.set(z, []);
       mesPorZona.get(z)!.push(m);
@@ -138,25 +119,64 @@ export default function Mesarios() {
       funPorZona.get(z)!.push(f);
     }
 
+    // Se temos locais de votação, agrupa por escola
+    if (locais && locais.length > 0) {
+      const map = new Map<string, { escola: string; bairro: string; endereco: string; zona: number; eleitores: number; secoes: Set<number> }>();
+      for (const l of locais) {
+        const key = `${l.local_votacao || 'Zona ' + l.zona}__${l.zona}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            escola: l.local_votacao || `Zona ${l.zona}`,
+            bairro: l.bairro || '',
+            endereco: l.endereco_local || '',
+            zona: l.zona || 0,
+            eleitores: 0,
+            secoes: new Set(),
+          });
+        }
+        const e = map.get(key)!;
+        e.eleitores += l.eleitorado_apto || 0;
+        if (l.secao) e.secoes.add(l.secao);
+      }
+
+      const result: EscolaGroup[] = [];
+      for (const [, info] of map) {
+        const mes = mesPorZona.get(info.zona) || [];
+        const fun = funPorZona.get(info.zona) || [];
+        result.push({
+          escola: info.escola,
+          bairro: info.bairro,
+          endereco: info.endereco,
+          zona: info.zona,
+          eleitores: info.eleitores,
+          secoes: info.secoes.size,
+          mesarios: mes,
+          funcoes: fun,
+          totalConvocados: mes.reduce((s, r) => s + (r.qt_convocados || 0), 0),
+          totalFuncoes: fun.reduce((s, r) => s + (r.qt_convocados || 0), 0),
+        });
+      }
+      return result.sort((a, b) => a.escola.localeCompare(b.escola));
+    }
+
+    // Fallback: agrupa por zona quando não há locais de votação
     const result: EscolaGroup[] = [];
-    for (const [, info] of map) {
-      const mes = mesPorZona.get(info.zona) || [];
-      const fun = funPorZona.get(info.zona) || [];
+    for (const [zona, mes] of mesPorZona) {
+      const fun = funPorZona.get(zona) || [];
       result.push({
-        escola: info.escola,
-        bairro: info.bairro,
-        endereco: info.endereco,
-        zona: info.zona,
-        eleitores: info.eleitores,
-        secoes: info.secoes.size,
+        escola: `Zona Eleitoral ${zona}`,
+        bairro: '',
+        endereco: '',
+        zona,
+        eleitores: 0,
+        secoes: 0,
         mesarios: mes,
         funcoes: fun,
         totalConvocados: mes.reduce((s, r) => s + (r.qt_convocados || 0), 0),
         totalFuncoes: fun.reduce((s, r) => s + (r.qt_convocados || 0), 0),
       });
     }
-
-    return result.sort((a, b) => a.escola.localeCompare(b.escola));
+    return result.sort((a, b) => a.zona - b.zona);
   }, [locais, mesarios, funcoes]);
 
   const filtered = useMemo(() => {
