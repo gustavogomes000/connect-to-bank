@@ -1,9 +1,10 @@
 import { useState, useMemo } from 'react';
-import { usePainelGeral, useKPIs, useComparecimento } from '@/hooks/useEleicoes';
+import { usePainelGeral, useKPIs, useComparecimento, useVotosRegional } from '@/hooks/useEleicoes';
 import { useFilterStore } from '@/stores/filterStore';
 import { formatNumber, formatPercent, getPartidoCor } from '@/lib/eleicoes';
 import { SituacaoBadge } from '@/components/eleicoes/SituacaoBadge';
 import { GeoFilterBadge } from '@/components/eleicoes/GeoFilterBadge';
+import { VotosRegionalTable } from '@/components/eleicoes/VotosRegionalTable';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -69,6 +70,7 @@ export default function Dashboard() {
   const { data: painel, isLoading: loadingPainel } = usePainelGeral(500);
   const { data: kpis, isLoading: loadingKpis } = useKPIs();
   const { data: comparecimento } = useComparecimento();
+  const { data: votosRegional, isLoading: loadingRegional } = useVotosRegional();
 
   const [sortKey, setSortKey] = useState<SortKey>('total_votos');
   const [sortAsc, setSortAsc] = useState(false);
@@ -316,6 +318,12 @@ export default function Dashboard() {
           </>
         )}
       </div>
+      {/* ── VOTOS POR REGIÃO ── */}
+      <VotosRegionalTable
+        data={votosRegional || []}
+        isLoading={loadingRegional}
+        title={`Votos por Zona / Bairro / Escola — ${municipio}`}
+      />
     </div>
   );
 }

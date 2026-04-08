@@ -5,11 +5,15 @@ import { SituacaoBadge } from '@/components/eleicoes/SituacaoBadge';
 import { CandidatoAvatar } from '@/components/eleicoes/CandidatoAvatar';
 import { KPISkeleton, TableSkeleton, ChartSkeleton } from '@/components/eleicoes/Skeletons';
 import { DataPendingCard } from '@/components/eleicoes/DataPendingCard';
+import { VotosRegionalTable } from '@/components/eleicoes/VotosRegionalTable';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, BarChart, Bar } from 'recharts';
-import { Search, Trophy, Users, TrendingUp, MapPin } from 'lucide-react';
+import { Search, Trophy, Users, TrendingUp, MapPin, School } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useFilterStore } from '@/stores/filterStore';
+import { mdQuery, getTableName } from '@/lib/motherduck';
+import { useQuery } from '@tanstack/react-query';
 
 import { Pagination } from '@/components/eleicoes/Pagination';
 
@@ -20,6 +24,7 @@ export default function PorMunicipio() {
   const [votosPageSize, setVotosPageSize] = useState(30);
   const { data: municipios } = useMunicipios();
   const { data: availability } = useDataAvailability();
+  const { ano } = useFilterStore();
   const navigate = useNavigate();
 
   const filtered = (municipios || []).filter((m) =>
@@ -30,6 +35,30 @@ export default function PorMunicipio() {
   const { data: candidatos, isLoading: loadingCandidatos } = useMunicipioCandidatos(selected);
   const { data: votos, isLoading: loadingVotos } = useMunicipioVotos(selected);
   const { data: zonas, isLoading: loadingZonas } = useVotacaoPorZona(selected || undefined);
+
+  // Regional breakdown for selected municipality
+  const { data: regional, isLoading: loadingRegional } = useQuery({
+    queryKey: ['municipioRegional', selected, ano],
+    queryFn: async () => {
+      if (!selected) return [];
+      const vot = getTableName('votacao_secao', ano);
+      const loc = getTableName('eleitorado_local', ano);
+      return mdQuery(`
+        SELECT v.NR_ZONA AS zona, COALESCE(loc.NM_BAIRRO, '') AS bairro,
+          COALESCE(loc.NM_LOCAL_VOTACAO, '') AS escola,
+          COUNT(DISTINCT v.NR_SECAO) AS secoes,
+          SUM(v.QT_VOTOS_NOMINAIS) AS total_votos
+        FROM ${vot} v
+        INNER JOIN ${loc} loc ON v.NR_ZONA = loc.NR_ZONA AND v.NR_SECAO = loc.NR_SECAO
+          AND loc.SG_UF = 'GO' AND loc.NM_MUNICIPIO = '${selected}'
+        WHERE v.NM_MUNICIPIO = '${selected}'
+        GROUP BY v.NR_ZONA, loc.NM_BAIRRO, loc.NM_LOCAL_VOTACAO
+        ORDER BY total_votos DESC LIMIT 300
+      `);
+    },
+    enabled: !!selected,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const hasComparecimento = availability?.comparecimento;
   const hasVotacao = availability?.votacao;
@@ -116,10 +145,11 @@ export default function PorMunicipio() {
           </div>
 
           <Tabs defaultValue="candidatos" className="space-y-3">
-            <TabsList>
+            <TabsList className="flex-wrap">
               <TabsTrigger value="candidatos"><Users className="w-3.5 h-3.5 mr-1" /> Candidatos</TabsTrigger>
               {hasVotacao && <TabsTrigger value="votados"><Trophy className="w-3.5 h-3.5 mr-1" /> Mais Votados</TabsTrigger>}
               {hasComparecimento && <TabsTrigger value="zonas"><MapPin className="w-3.5 h-3.5 mr-1" /> Por Zona</TabsTrigger>}
+              <TabsTrigger value="regional"><School className="w-3.5 h-3.5 mr-1" /> Por Bairro/Escola</TabsTrigger>
               {hasComparecimento && <TabsTrigger value="historico"><TrendingUp className="w-3.5 h-3.5 mr-1" /> Histórico</TabsTrigger>}
             </TabsList>
 
@@ -250,6 +280,15 @@ export default function PorMunicipio() {
                 ) : <p className="text-center text-muted-foreground py-8 text-sm">Nenhum dado de zona eleitoral.</p>}
               </TabsContent>
             )}
+
+            <TabsContent value="regional">
+              <VotosRegionalTable
+                data={regional || []}
+                isLoading={loadingRegional}
+                title={`Votos por Bairro/Escola — ${selected}`}
+                emptyMessage="Selecione um município para ver a distribuição regional."
+              />
+            </TabsContent>
 
             {hasComparecimento && resumo && (
               <TabsContent value="historico">
