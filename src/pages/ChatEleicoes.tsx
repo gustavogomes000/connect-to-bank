@@ -42,9 +42,29 @@ function MessageBubble({ message, onSalvar, isSalvo }: { message: ChatMessage; o
             : 'bg-card border border-border/30 rounded-bl-md shadow-sm'
       )}>
         {message.loading ? (
-          <div className="flex items-center gap-2.5 text-muted-foreground py-1">
-            <Loader2 className="w-4 h-4 animate-spin text-primary" />
-            <span className="text-xs">Processando sua pergunta...</span>
+          <div className="space-y-3 w-full min-w-[200px]">
+            <div className="flex items-center gap-2 mb-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+              <span className="text-[10px] text-muted-foreground">Processando consulta...</span>
+            </div>
+            <Skeleton className="h-3.5 w-[85%] rounded" />
+            <Skeleton className="h-3.5 w-[70%] rounded" />
+            <Skeleton className="h-3.5 w-[55%] rounded" />
+            <div className="mt-3 rounded-lg border border-border/15 overflow-hidden">
+              <div className="bg-muted/20 px-3 py-2 flex gap-5">
+                <Skeleton className="h-3 w-16 rounded" />
+                <Skeleton className="h-3 w-20 rounded" />
+                <Skeleton className="h-3 w-14 rounded" />
+              </div>
+              {[0,1,2].map(i => (
+                <div key={i} className="px-3 py-2 flex gap-5 border-t border-border/10">
+                  <Skeleton className="h-3 w-16 rounded" />
+                  <Skeleton className="h-3 w-20 rounded" />
+                  <Skeleton className="h-3 w-14 rounded" />
+                </div>
+              ))}
+            </div>
+            <Skeleton className="h-[120px] w-full rounded-lg mt-2" />
           </div>
         ) : (
           <>
