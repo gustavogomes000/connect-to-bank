@@ -496,7 +496,7 @@ export function sqlSecoesLocal(ano: number, municipio: string, localVotacao: str
     SELECT
       NR_SECAO AS secao,
       NR_ZONA AS zona,
-      SUM(QT_ELEITORES_PERFIL) AS eleitores
+      SUM(QT_ELEITOR_SECAO) AS eleitores
     FROM ${tab}
     WHERE SG_UF = 'GO'
       AND NM_MUNICIPIO = '${municipio}'
