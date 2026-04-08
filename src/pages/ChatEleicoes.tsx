@@ -5,7 +5,7 @@ import { formatNumber } from '@/lib/eleicoes';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import DynamicChart from '@/components/eleicoes/DynamicChart';
+import DynamicChartRenderer from '@/components/eleicoes/DynamicChartRenderer';
 import {
   MessageSquare, Send, Loader2, Code2, Trash2, Database,
   Lightbulb, BarChart3, Star, Bookmark, X, AlertTriangle,
