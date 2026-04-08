@@ -45,7 +45,7 @@ export function GlobalFilters() {
         <Label htmlFor="municipio">Município</Label>
         <Select 
           value={municipio || "todos"} 
-          onValueChange={(val) => setMunicipio(val === "todos" ? null : val)}
+          onValueChange={(val) => setMunicipio(val === "todos" ? "GOIÂNIA" : val)}
         >
           <SelectTrigger id="municipio">
             <SelectValue placeholder="Todos os Municípios" />
