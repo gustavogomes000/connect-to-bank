@@ -24,7 +24,7 @@ function useCandidatos() {
       const tab = getTableName('candidatos', ano);
       const conds: string[] = [
         `SG_UF = 'GO'`,
-        `NM_MUNICIPIO = '${municipio}'`,
+        `NM_UE = '${municipio}'`,
         `NR_TURNO = 1`,
       ];
       if (cargo) conds.push(`DS_CARGO = '${cargo}'`);
