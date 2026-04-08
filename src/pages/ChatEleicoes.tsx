@@ -362,6 +362,22 @@ export default function ChatEleicoes() {
             </p>
           </div>
         )}
+
+        {/* Quick suggestion chips above input */}
+        {!isEmpty && !loading && (
+          <div className="flex flex-wrap gap-1.5 mb-2">
+            {SUGESTOES_RAPIDAS.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => handleSend(s)}
+                className="text-[10px] px-2.5 py-1 rounded-full border border-border/30 text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-primary/5 transition-all"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex gap-2 items-end">
           <div className="flex-1 relative">
             <Textarea
