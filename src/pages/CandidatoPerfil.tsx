@@ -621,26 +621,6 @@ export default function CandidatoPerfil() {
         nrCandidato={nrCandidato}
         ano={ano}
       />
-                    <TableHead className="text-[10px] text-slate-500">Zona</TableHead>
-                    <TableHead className="text-[10px] text-slate-500">Local</TableHead>
-                    <TableHead className="text-[10px] text-slate-500 text-right">Votos</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {geo.byZonaLocal.slice(0, 80).map((r, i) => (
-                    <TableRow key={i} className="border-border/60">
-                      <TableCell className="text-xs text-slate-500">{r.municipio}</TableCell>
-                      <TableCell className="text-xs text-slate-900 font-mono">{r.zona}</TableCell>
-                      <TableCell className="text-xs text-slate-900">{r.local_votacao || '—'}</TableCell>
-                      <TableCell className="text-sm text-slate-900 text-right font-mono">{Number(r.total_votos).toLocaleString('pt-BR')}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        )}
-      </section>
 
       <section className="bg-white rounded-xl border border-border p-4">
         <div className="flex items-center gap-2">
