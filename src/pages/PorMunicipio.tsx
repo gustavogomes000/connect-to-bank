@@ -145,10 +145,11 @@ export default function PorMunicipio() {
           </div>
 
           <Tabs defaultValue="candidatos" className="space-y-3">
-            <TabsList>
+            <TabsList className="flex-wrap">
               <TabsTrigger value="candidatos"><Users className="w-3.5 h-3.5 mr-1" /> Candidatos</TabsTrigger>
               {hasVotacao && <TabsTrigger value="votados"><Trophy className="w-3.5 h-3.5 mr-1" /> Mais Votados</TabsTrigger>}
               {hasComparecimento && <TabsTrigger value="zonas"><MapPin className="w-3.5 h-3.5 mr-1" /> Por Zona</TabsTrigger>}
+              <TabsTrigger value="regional"><School className="w-3.5 h-3.5 mr-1" /> Por Bairro/Escola</TabsTrigger>
               {hasComparecimento && <TabsTrigger value="historico"><TrendingUp className="w-3.5 h-3.5 mr-1" /> Histórico</TabsTrigger>}
             </TabsList>
 
