@@ -104,6 +104,8 @@ interface FiltrosPainel {
   turno?: number;
   genero?: string;
   situacao?: string;
+  bairro?: string;
+  escola?: string;
   limite?: number;
 }
 
