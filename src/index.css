@@ -6,29 +6,29 @@
 
 @layer base {
   :root {
-    /* Dark intelligence theme — matching reference screenshots */
-    --background: 210 29% 10%;
-    --foreground: 210 20% 92%;
+    /* MODO CLARO - Dossiê 360º LinkedIn Style */
+    --background: 0 0% 100%; /* bg-white */
+    --foreground: 220 17% 7%; /* texto escuro */
 
-    --card: 210 25% 13%;
-    --card-foreground: 210 20% 92%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 17% 7%;
 
-    --popover: 210 25% 15%;
-    --popover-foreground: 210 20% 92%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 17% 7%;
 
-    --primary: 190 80% 45%;
-    --primary-foreground: 210 29% 8%;
+    --primary: 330 81% 60%; /* #EC4899 - Sarelli Pink */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 338 72% 60%;
+    --secondary: 42 47% 59%; /* #C8AA64 - Accent Gold */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 210 20% 18%;
-    --muted-foreground: 210 15% 55%;
+    --muted: 220 14% 96%; /* bg-slate-100 */
+    --muted-foreground: 220 8% 46%; /* text-slate-500 */
 
-    --accent: 190 40% 20%;
-    --accent-foreground: 190 80% 60%;
+    --accent: 42 47% 59%; /* Accent Gold */
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 156 72% 40%;
@@ -40,31 +40,29 @@
     --info: 200 80% 55%;
     --info-foreground: 0 0% 100%;
 
-    --border: 210 20% 20%;
-    --input: 210 20% 18%;
-    --ring: 190 80% 45%;
+    --border: 220 13% 91%; /* border-slate-200 */
+    --input: 220 13% 91%;
+    --ring: 330 81% 60%;
 
-    --radius: 0.5rem;
+    --radius: 1rem; /* rounded-2xl = 16px */
 
-    --sidebar-background: 210 30% 8%;
-    --sidebar-foreground: 210 15% 80%;
-    --sidebar-primary: 190 80% 45%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 17% 7%;
+    --sidebar-primary: 330 81% 60%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 25% 14%;
-    --sidebar-accent-foreground: 210 15% 85%;
-    --sidebar-border: 210 20% 16%;
-    --sidebar-ring: 190 80% 45%;
+    --sidebar-accent: 220 14% 96%;
+    --sidebar-accent-foreground: 220 17% 7%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 330 81% 60%;
 
-    --chart-1: 190 80% 45%;
-    --chart-2: 338 72% 60%;
+    --chart-1: 330 81% 60%;
+    --chart-2: 42 47% 59%;
     --chart-3: 156 72% 40%;
     --chart-4: 45 93% 50%;
     --chart-5: 280 60% 55%;
-    --chart-6: 25 85% 55%;
-    --chart-7: 160 60% 45%;
-    --chart-8: 320 65% 50%;
   }
 }
+
 
 @layer base {
   * {
@@ -128,7 +126,9 @@
 
 /* Glass morphism card */
 .glass-card {
-  background: hsl(var(--card) / 0.8);
-  backdrop-filter: blur(12px);
+  background: hsl(0 0% 100% / 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid hsl(var(--border));
+  box-shadow: 0 4px 20px -2px hsl(0 0% 0% / 0.05); /* Sombras suaves estilo linkedin */
 }

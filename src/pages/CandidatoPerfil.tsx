@@ -8,9 +8,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, User, Briefcase, GraduationCap, MapPin, Calendar, DollarSign, Shield, Vote, TrendingUp, History } from 'lucide-react';
+import { ArrowLeft, User, Briefcase, GraduationCap, MapPin, Calendar, DollarSign, Shield, Vote, TrendingUp, History, Bot } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useFilterStore } from '@/stores/filterStore';
+import { useFilterStore } from '@/store/filterStore';
+import { ListaBens, ResumoReceitas } from '@/components/FinanceiroCandidato';
+import { CentralInteligencia } from '@/components/CentralInteligencia';
+import { AIChatDashboard } from '@/components/AIChatDashboard';
 
 // ═══════════════════════════════════════════════════════
 // Helpers
@@ -42,10 +45,10 @@ function calcAge(dateStr: string | null | undefined): string {
 function InfoRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string | null | undefined }) {
   return (
     <div className="flex items-start gap-2 py-1.5">
-      <Icon className="w-3.5 h-3.5 text-muted-foreground mt-0.5 shrink-0" />
+      <Icon className="w-3.5 h-3.5 text-accent mt-0.5 shrink-0" />
       <div className="min-w-0">
-        <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
-        <p className="text-sm font-medium truncate">{value || '—'}</p>
+        <p className="text-[10px] text-accent uppercase tracking-wider font-semibold">{label}</p>
+        <p className="text-sm font-bold text-foreground uppercase truncate">{value || '—'}</p>
       </div>
     </div>
   );
@@ -183,8 +186,8 @@ export default function CandidatoPerfil() {
           <div className="flex-1 min-w-0">
             <div className="flex items-start gap-3 flex-wrap">
               <div>
-                <h1 className="text-xl font-bold leading-tight">{nomeUrna}</h1>
-                <p className="text-xs text-muted-foreground">{perfil.nome_completo}</p>
+                <h1 className="text-2xl font-bold leading-tight uppercase text-foreground">{nomeUrna}</h1>
+                <p className="text-xs text-accent uppercase font-bold">{perfil.nome_completo}</p>
               </div>
               <div className="flex gap-2 items-center">
                 <span
@@ -197,7 +200,7 @@ export default function CandidatoPerfil() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-1 mt-3">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-2 mt-4 bg-muted/10 p-3 rounded-xl border border-border/20">
               <InfoRow icon={Briefcase} label="Cargo" value={perfil.cargo} />
               <InfoRow icon={MapPin} label="Município" value={perfil.municipio} />
               <InfoRow icon={Calendar} label="Idade" value={calcAge(perfil.data_nascimento)} />
@@ -235,6 +238,9 @@ export default function CandidatoPerfil() {
           </TabsTrigger>
           <TabsTrigger value="patrimonio" className="text-xs data-[state=active]:bg-background gap-1.5">
             <TrendingUp className="w-3.5 h-3.5" /> Evolução Patrimonial
+          </TabsTrigger>
+          <TabsTrigger value="inteligencia" className="text-xs data-[state=active]:bg-background gap-1.5">
+            <Bot className="w-3.5 h-3.5" /> Inteligência Artificial
           </TabsTrigger>
         </TabsList>
 
@@ -281,144 +287,22 @@ export default function CandidatoPerfil() {
           )}
         </TabsContent>
 
-        {/* ── ABA: FORÇA TERRITORIAL (com Zona + Bairro + Escola) ── */}
-        <TabsContent value="territorial" className="p-0 mt-0">
-          <div className="px-4 py-2 border-b border-border/30">
-            <GeoFilterBadge />
-          </div>
-          {votacaoTerritorial.length === 0 && votacaoZona.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">Sem dados de votação territorial.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-border/30">
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground w-[50px]">#</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground w-[70px]">Zona</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground">Bairro</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground">Local de Votação (Escola)</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground text-right w-[100px]">Votos</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground text-right w-[80px]">% do Total</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground w-[140px]">Dominância</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(votacaoTerritorial.length > 0 ? votacaoTerritorial : votacaoZona)
-                    .sort((a: any, b: any) => Number(b.total_votos) - Number(a.total_votos))
-                    .map((z: any, i: number) => {
-                      const votos = Number(z.total_votos || 0);
-                      const pct = totalVotosZona > 0 ? (votos / totalVotosZona) * 100 : 0;
-                      const hasBairro = z.bairro && z.bairro.trim() !== '';
-                      const hasEscola = z.escola && z.escola.trim() !== '';
-                      return (
-                        <TableRow key={i} className="border-border/20 hover:bg-muted/30">
-                          <TableCell className="text-xs text-muted-foreground font-mono tabular-nums py-1.5">{i + 1}</TableCell>
-                          <TableCell className="text-sm font-medium py-1.5 tabular-nums">
-                            {z.zona}
-                          </TableCell>
-                          <TableCell className="text-xs py-1.5">
-                            {hasBairro
-                              ? <span className="font-medium">{z.bairro}</span>
-                              : <span className="text-muted-foreground text-[10px] italic">Não informado</span>
-                            }
-                          </TableCell>
-                          <TableCell className="text-xs py-1.5 max-w-[220px] truncate">
-                            {hasEscola
-                              ? <span>{z.escola}</span>
-                              : <span className="text-muted-foreground text-[10px] italic">Não informado</span>
-                            }
-                          </TableCell>
-                          <TableCell className="text-sm font-bold text-right tabular-nums py-1.5">{formatNumber(votos)}</TableCell>
-                          <TableCell className="text-xs text-right tabular-nums text-muted-foreground py-1.5">{formatPercent(pct, 1)}</TableCell>
-                          <TableCell className="py-1.5">
-                            <div className="flex items-center gap-2">
-                              <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-primary transition-all"
-                                  style={{ width: `${Math.min(pct, 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-[10px] font-mono text-muted-foreground w-8 text-right">{pct.toFixed(0)}%</span>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
+        {/* ── ABA: FORÇA TERRITORIAL (Central Inteligência) ── */}
+        <TabsContent value="territorial" className="p-4 mt-0 bg-muted/20">
+          <CentralInteligencia sqCandidato={id!} />
         </TabsContent>
 
-        {/* ── ABA: EVOLUÇÃO PATRIMONIAL ── */}
+        {/* ── ABA: FINANÇAS E PATRIMÔNIO ── */}
         <TabsContent value="patrimonio" className="p-0 mt-0">
-          {/* Evolução por ano */}
-          {evolucaoPatrimonio && evolucaoPatrimonio.length > 0 && (
-            <div className="px-4 py-3 border-b border-border/30">
-              <h4 className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">Evolução por Eleição</h4>
-              <div className="flex items-end gap-3 h-16">
-                {(evolucaoPatrimonio as any[]).map((ep: any, i: number) => {
-                  const max = Math.max(...(evolucaoPatrimonio as any[]).map((e: any) => e.patrimonio));
-                  const h = max > 0 ? (ep.patrimonio / max) * 100 : 0;
-                  return (
-                    <div key={i} className="flex flex-col items-center gap-1 min-w-[50px]">
-                      <span className="text-[9px] font-mono text-muted-foreground">{formatBRLCompact(ep.patrimonio)}</span>
-                      <div className="w-8 bg-primary/20 rounded-t relative" style={{ height: `${Math.max(h, 4)}%` }}>
-                        <div className="absolute inset-0 bg-primary/60 rounded-t" />
-                      </div>
-                      <span className="text-[10px] font-bold">{ep.ano}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          <div className="p-4 space-y-6">
+            <ResumoReceitas sqCandidato={id!} />
+            <ListaBens sqCandidato={id!} />
+          </div>
+        </TabsContent>
 
-          {/* Tabela de bens */}
-          {bens.length === 0 ? (
-            <div className="p-8 text-center text-sm text-muted-foreground">Nenhum bem declarado.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent border-border/30">
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground w-[40px]">#</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground w-[160px]">Tipo</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground">Descrição</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground text-right w-[120px]">Valor</TableHead>
-                    <TableHead className="text-[10px] font-semibold text-muted-foreground text-right w-[70px]">% Patri.</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {bens.map((b: any, i: number) => {
-                    const valor = Number(b.valor || 0);
-                    const pct = patrimonioTotal > 0 ? (valor / patrimonioTotal) * 100 : 0;
-                    return (
-                      <TableRow key={i} className="border-border/20 hover:bg-muted/30">
-                        <TableCell className="text-xs text-muted-foreground font-mono tabular-nums py-1.5">{b.ordem || i + 1}</TableCell>
-                        <TableCell className="text-xs font-medium py-1.5 truncate max-w-[160px]">{b.tipo}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground py-1.5 truncate max-w-[300px]" title={b.descricao}>{b.descricao}</TableCell>
-                        <TableCell className="text-sm font-bold text-right tabular-nums py-1.5">
-                          {valor > 0 ? formatBRL(valor) : '—'}
-                        </TableCell>
-                        <TableCell className="text-[10px] text-right tabular-nums text-muted-foreground py-1.5">
-                          {pct > 0 ? formatPercent(pct, 1) : '—'}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {/* Total row */}
-                  <TableRow className="border-border/30 bg-muted/20 hover:bg-muted/30">
-                    <TableCell colSpan={3} className="text-xs font-semibold py-2">TOTAL ({totalBens} bens)</TableCell>
-                    <TableCell className="text-sm font-bold text-right tabular-nums py-2 text-warning">
-                      {formatBRL(patrimonioTotal)}
-                    </TableCell>
-                    <TableCell className="text-xs text-right tabular-nums py-2">100%</TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
-            </div>
-          )}
+        {/* ── ABA: ASSISTENTE IA ── */}
+        <TabsContent value="inteligencia" className="p-4 mt-0 bg-muted/20">
+          <AIChatDashboard sqCandidato={id!} nomeCandidato={nomeUrna} />
         </TabsContent>
       </Tabs>
     </div>

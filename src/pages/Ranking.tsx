@@ -1,127 +1,76 @@
-import { useState } from 'react';
-import { useRanking, useDataAvailability } from '@/hooks/useEleicoes';
-import { formatNumber } from '@/lib/eleicoes';
-import { CandidatoAvatar } from '@/components/eleicoes/CandidatoAvatar';
-import { SituacaoBadge } from '@/components/eleicoes/SituacaoBadge';
-import { TableSkeleton } from '@/components/eleicoes/Skeletons';
-import { Pagination } from '@/components/eleicoes/Pagination';
-import { Input } from '@/components/ui/input';
-import { Search, ArrowUpDown, Trophy } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { getPartidoCor } from '@/lib/eleicoes';
+import { useNavigate } from "react-router-dom";
+import { useRanking } from "@/hooks/useRanking";
+import { GlobalFilters } from "@/components/eleicoes/GlobalFilters";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { formatNumber, getPartidoCor } from "@/lib/eleicoes";
 
 export default function Ranking() {
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [page, setPage] = useState(0);
-  const [sortBy, setSortBy] = useState('nome_urna');
-  const [sortAsc, setSortAsc] = useState(true);
-  const [pageSize, setPageSize] = useState(30);
   const navigate = useNavigate();
-  const { data: availability } = useDataAvailability();
+  const { data, isLoading, isError, error } = useRanking();
 
-  const [timer, setTimer] = useState<any>(null);
-  const handleSearch = (v: string) => {
-    setSearch(v);
-    if (timer) clearTimeout(timer);
-    setTimer(setTimeout(() => { setDebouncedSearch(v); setPage(0); }, 300));
-  };
-
-  const { data, isLoading } = useRanking(debouncedSearch, page, sortBy, sortAsc, pageSize);
-  const hasVotos = data?.hasVotos || false;
-
-  const toggleSort = (col: string) => {
-    if (sortBy === col) setSortAsc(!sortAsc);
-    else { setSortBy(col); setSortAsc(col === 'nome_urna'); }
-  };
-
-  const SortHeader = ({ col, label, className = '' }: { col: string; label: string; className?: string }) => (
-    <th
-      className={`pb-2 pt-2 px-2 font-medium text-muted-foreground cursor-pointer hover:text-primary select-none text-[10px] uppercase tracking-wider whitespace-nowrap ${className}`}
-      onClick={() => toggleSort(col)}
-    >
-      <span className="inline-flex items-center gap-0.5">
-        {label}
-        <ArrowUpDown className={`w-2.5 h-2.5 ${sortBy === col ? 'text-primary' : 'opacity-30'}`} />
-      </span>
-    </th>
+  // Helper to render a skeleton row (5 columns + position)
+  const renderSkeletonRow = (key: number) => (
+    <TableRow key={key} className="border-b border-border/20">
+      <TableCell className="px-2 py-1.5"><Skeleton className="h-4 w-4" /></TableCell>
+      <TableCell className="px-2 py-1.5"><Skeleton className="h-4 w-24" /></TableCell>
+      <TableCell className="px-2 py-1.5"><Skeleton className="h-4 w-12" /></TableCell>
+      <TableCell className="px-2 py-1.5"><Skeleton className="h-4 w-20" /></TableCell>
+      <TableCell className="px-2 py-1.5"><Skeleton className="h-4 w-12" /></TableCell>
+      <TableCell className="px-2 py-1.5"><Skeleton className="h-4 w-16" /></TableCell>
+    </TableRow>
   );
 
   return (
-    <div className="space-y-3 max-w-[1600px] mx-auto">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-primary" />
-          Ranking de Candidatos
-        </h1>
-        <span className="text-xs text-muted-foreground">{formatNumber(data?.count || 0)} registros</span>
-      </div>
+    <div className="space-y-4 max-w-[1600px] mx-auto p-2">
+      {/* Filters */}
+      <GlobalFilters />
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            placeholder="Buscar por nome..."
-            className="pl-9 h-8 text-xs bg-muted/50 border-border/50"
-          />
-        </div>
-      </div>
-
-      {isLoading ? <TableSkeleton /> : (
-        <div className="bg-card rounded-lg border border-border/50 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs table-striped">
-              <thead>
-                <tr className="border-b border-border/30 text-left bg-muted/30">
-                  <th className="px-2 pb-2 pt-2 font-medium text-muted-foreground w-8 text-[10px]">#</th>
-                  <th className="pb-2 pt-2 font-medium text-muted-foreground w-8"></th>
-                  <SortHeader col="nome_urna" label="Nome" />
-                  <SortHeader col="numero_urna" label="Nº" />
-                  <SortHeader col="sigla_partido" label="Partido" />
-                  <SortHeader col="cargo" label="Cargo" />
-                  <SortHeader col="municipio" label="Município" />
-                  <SortHeader col="ano" label="Ano" />
-                  <th className="pb-2 pt-2 px-2 font-medium text-muted-foreground text-[10px] uppercase tracking-wider">Situação</th>
-                  {hasVotos && <SortHeader col="nome_urna" label="Votos" className="text-right" />}
-                </tr>
-              </thead>
-              <tbody>
-                {(data?.data || []).map((r: any, idx: number) => {
-                  const pos = page * pageSize + idx + 1;
-                  return (
-                    <tr
-                      key={`${r.id}-${r.ano}`}
-                      className="border-b border-border/20 last:border-0 cursor-pointer hover:bg-primary/5 transition-colors"
-                      onClick={() => navigate(`/candidato/${r.id}`)}
-                    >
-                      <td className="px-2 py-1.5 font-medium text-muted-foreground">{pos}</td>
-                      <td className="py-1.5"><CandidatoAvatar nome={r.nome_urna || r.nome_completo} fotoUrl={r.foto_url} size={26} /></td>
-                      <td className="py-1.5 px-2 font-medium">{r.nome_urna || r.nome_completo}</td>
-                      <td className="py-1.5 px-2 font-mono text-muted-foreground">{r.numero_urna}</td>
-                      <td className="py-1.5 px-2 font-semibold" style={{ color: getPartidoCor(r.sigla_partido) }}>{r.sigla_partido}</td>
-                      <td className="py-1.5 px-2">{r.cargo}</td>
-                      <td className="py-1.5 px-2">{r.municipio}</td>
-                      <td className="py-1.5 px-2 text-muted-foreground">{r.ano}</td>
-                      <td className="py-1.5 px-2"><SituacaoBadge situacao={r.situacao_final} /></td>
-                      {hasVotos && <td className="py-1.5 px-2 text-right font-semibold text-primary metric-value">{formatNumber(r.total_votos)}</td>}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <Pagination
-            page={page}
-            totalItems={data?.count || 0}
-            pageSize={pageSize}
-            onPageChange={setPage}
-            onPageSizeChange={setPageSize}
-          />
-        </div>
+      {/* Content */}
+      {isError && (
+        <Alert variant="destructive">
+          <AlertTitle>Erro</AlertTitle>
+          <AlertDescription>{(error as Error).message || "Falha ao carregar ranking."}</AlertDescription>
+        </Alert>
       )}
+
+      <div className="bg-card rounded-lg border border-border/50 overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table className="w-full text-sm table-auto">
+            <TableHeader>
+              <TableRow className="bg-muted/30 border-b border-border/30 text-left">
+                <TableHead className="px-2 py-2 w-8 text-[10px] uppercase tracking-wider">#</TableHead>
+                <TableHead className="px-2 py-2 text-[10px] uppercase tracking-wider">Nome</TableHead>
+                <TableHead className="px-2 py-2 text-[10px] uppercase tracking-wider">Partido</TableHead>
+                <TableHead className="px-2 py-2 text-[10px] uppercase tracking-wider">Cargo</TableHead>
+                <TableHead className="px-2 py-2 text-[10px] uppercase tracking-wider">Município</TableHead>
+                <TableHead className="px-2 py-2 text-[10px] uppercase tracking-wider text-right">Votos</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading && Array.from({ length: 10 }).map((_, i) => renderSkeletonRow(i))}
+              {data && data.dados.map((item, idx) => (
+                <TableRow
+                  key={item.SQ_CANDIDATO ?? idx}
+                  className="border-b border-border/20 hover:bg-primary/5 cursor-pointer transition-colors"
+                  onClick={() => navigate(`/candidato/${item.SQ_CANDIDATO}`)}
+                >
+                  <TableCell className="px-2 py-1.5 text-muted-foreground">{idx + 1}</TableCell>
+                  <TableCell className="px-2 py-1.5 font-medium">{item.NM_CANDIDATO}</TableCell>
+                  <TableCell className="px-2 py-1.5 font-semibold" style={{ color: getPartidoCor(item.NM_PARTIDO) }}>{item.NM_PARTIDO}</TableCell>
+                  <TableCell className="px-2 py-1.5">{item.DS_CARGO}</TableCell>
+                  <TableCell className="px-2 py-1.5 text-muted-foreground">{item.NM_MUNICIPIO_NASCIMENTO}</TableCell>
+                  <TableCell className="px-2 py-1.5 text-right font-bold text-primary">
+                    {formatNumber(item.total_votos)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
     </div>
   );
 }
