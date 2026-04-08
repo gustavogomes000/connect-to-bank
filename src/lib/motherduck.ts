@@ -149,10 +149,9 @@ export function sqlPainelCandidatos(filtros: FiltrosPainel = {}): string {
   const ano = filtros.ano || 2024;
   const cand = getTableName('candidatos', ano);
   const limit = filtros.limite || 100;
-  const needGeo = !!(filtros.bairro || filtros.escola);
+  const geo = needsGeoJoin(filtros);
 
-  // When geo filters active, use votacao_secao + eleitorado_local for precise filtering
-  const vot = needGeo ? getTableName('votacao_secao', ano) : getTableName('votacao', ano);
+  const vot = geo ? getTableName('votacao_secao', ano) : getTableName('votacao', ano);
 
   const conds: string[] = [];
   if (filtros.municipio) conds.push(`c.NM_UE = '${filtros.municipio}'`);
@@ -162,13 +161,8 @@ export function sqlPainelCandidatos(filtros: FiltrosPainel = {}): string {
   if (filtros.genero) conds.push(`c.DS_GENERO = '${filtros.genero}'`);
   if (filtros.situacao) conds.push(`c.DS_SIT_TOT_TURNO ILIKE '%${filtros.situacao}%'`);
 
-  let geoJoin = '';
-  if (needGeo) {
-    const loc = getTableName('eleitorado_local', ano);
-    geoJoin = `INNER JOIN ${loc} loc ON v.NR_ZONA = loc.NR_ZONA AND v.NR_SECAO = loc.NR_SECAO AND loc.SG_UF = 'GO' AND loc.NM_MUNICIPIO = '${filtros.municipio}'`;
-    if (filtros.bairro) conds.push(`loc.NM_BAIRRO = '${filtros.bairro}'`);
-    if (filtros.escola) conds.push(`loc.NM_LOCAL_VOTACAO = '${filtros.escola}'`);
-  }
+  const { join: geoJoin, conds: geoConds } = buildGeoJoin(filtros);
+  conds.push(...geoConds);
 
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
 
@@ -263,17 +257,24 @@ export function sqlPatrimonioCandidato(ano: number, sqCandidato: string): string
 }
 
 /** Histórico de votação por zona (MunZona) */
-export function sqlVotacaoPorZona(ano: number, sqCandidato: string): string {
-  const vot = getTableName('votacao', ano);
+export function sqlVotacaoPorZona(ano: number, sqCandidato: string, filtros?: FiltrosPainel): string {
+  const geo = filtros && needsGeoJoin(filtros);
+  const vot = geo ? getTableName('votacao_secao', ano) : getTableName('votacao', ano);
+
+  const conds: string[] = [`v.SQ_CANDIDATO = '${sqCandidato}'`];
+  const { join: geoJoin, conds: geoConds } = filtros ? buildGeoJoin(filtros, 'v') : { join: '', conds: [] as string[] };
+  conds.push(...geoConds);
+  const where = `WHERE ${conds.join(' AND ')}`;
 
   return `
     SELECT
-      NR_ZONA AS zona,
-      NM_MUNICIPIO AS municipio,
-      SUM(QT_VOTOS_NOMINAIS) AS total_votos
-    FROM ${vot}
-    WHERE SQ_CANDIDATO = '${sqCandidato}'
-    GROUP BY NR_ZONA, NM_MUNICIPIO
+      v.NR_ZONA AS zona,
+      v.NM_MUNICIPIO AS municipio,
+      SUM(v.QT_VOTOS_NOMINAIS) AS total_votos
+    FROM ${vot} v
+    ${geoJoin}
+    ${where}
+    GROUP BY v.NR_ZONA, v.NM_MUNICIPIO
     ORDER BY total_votos DESC
   `.trim();
 }
