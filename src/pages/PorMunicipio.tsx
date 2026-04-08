@@ -290,7 +290,7 @@ export default function PorMunicipio() {
               />
             </TabsContent>
 
-
+            {hasComparecimento && resumo && (
               <TabsContent value="historico">
                 <div className="bg-card rounded-lg border border-border/50 p-4">
                   <ResponsiveContainer width="100%" height={300}>
