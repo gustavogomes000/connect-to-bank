@@ -24,6 +24,7 @@ export default function PorMunicipio() {
   const [votosPageSize, setVotosPageSize] = useState(30);
   const { data: municipios } = useMunicipios();
   const { data: availability } = useDataAvailability();
+  const { ano } = useFilterStore();
   const navigate = useNavigate();
 
   const filtered = (municipios || []).filter((m) =>
@@ -34,6 +35,30 @@ export default function PorMunicipio() {
   const { data: candidatos, isLoading: loadingCandidatos } = useMunicipioCandidatos(selected);
   const { data: votos, isLoading: loadingVotos } = useMunicipioVotos(selected);
   const { data: zonas, isLoading: loadingZonas } = useVotacaoPorZona(selected || undefined);
+
+  // Regional breakdown for selected municipality
+  const { data: regional, isLoading: loadingRegional } = useQuery({
+    queryKey: ['municipioRegional', selected, ano],
+    queryFn: async () => {
+      if (!selected) return [];
+      const vot = getTableName('votacao_secao', ano);
+      const loc = getTableName('eleitorado_local', ano);
+      return mdQuery(`
+        SELECT v.NR_ZONA AS zona, COALESCE(loc.NM_BAIRRO, '') AS bairro,
+          COALESCE(loc.NM_LOCAL_VOTACAO, '') AS escola,
+          COUNT(DISTINCT v.NR_SECAO) AS secoes,
+          SUM(v.QT_VOTOS_NOMINAIS) AS total_votos
+        FROM ${vot} v
+        INNER JOIN ${loc} loc ON v.NR_ZONA = loc.NR_ZONA AND v.NR_SECAO = loc.NR_SECAO
+          AND loc.SG_UF = 'GO' AND loc.NM_MUNICIPIO = '${selected}'
+        WHERE v.NM_MUNICIPIO = '${selected}'
+        GROUP BY v.NR_ZONA, loc.NM_BAIRRO, loc.NM_LOCAL_VOTACAO
+        ORDER BY total_votos DESC LIMIT 300
+      `);
+    },
+    enabled: !!selected,
+    staleTime: 5 * 60 * 1000,
+  });
 
   const hasComparecimento = availability?.comparecimento;
   const hasVotacao = availability?.votacao;
