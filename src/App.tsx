@@ -14,6 +14,7 @@ import CandidatoPerfil from "./pages/CandidatoPerfil";
 import Configuracoes from "./pages/Configuracoes";
 import Ajuda from "./pages/Ajuda";
 import Mesarios from "./pages/Mesarios";
+import PerfilCandidatos from "./pages/PerfilCandidatos";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
