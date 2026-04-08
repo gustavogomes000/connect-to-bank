@@ -1,45 +1,38 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { useFilterStore } from '@/stores/filterStore';
-import { mdQuery, getTableName, getAnosDisponiveis } from '@/lib/motherduck';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { Search, User, MapPin, Landmark, GraduationCap, ChevronRight } from 'lucide-react';
+import { Search, User, Landmark, GraduationCap, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-function useBuscaCandidatos() {
+function useCandidatos() {
   const ano = useFilterStore((s) => s.ano);
   const municipio = useFilterStore((s) => s.municipio);
+  const cargo = useFilterStore((s) => s.cargo);
+  const partido = useFilterStore((s) => s.partido);
+  const zona = useFilterStore((s) => s.zona);
 
   return useQuery({
-    queryKey: ['candidatos-busca', ano, municipio],
+    queryKey: ['candidatos-lista', ano, municipio, cargo, partido, zona],
     queryFn: async () => {
-      if (!getAnosDisponiveis('candidatos').includes(ano)) return [];
-      const tab = getTableName('candidatos', ano);
-      const rows = await mdQuery<any>(`
-        SELECT
-          SQ_CANDIDATO AS id,
-          NM_CANDIDATO AS nome,
-          NM_URNA_CANDIDATO AS nome_urna,
-          DS_CARGO AS cargo,
-          NR_CANDIDATO AS numero,
-          SG_PARTIDO AS partido,
-          DS_SIT_TOT_TURNO AS situacao,
-          DS_GRAU_INSTRUCAO AS instrucao,
-          DS_GENERO AS genero,
-          DS_COR_RACA AS cor_raca,
-          DS_OCUPACAO AS ocupacao,
-          DT_NASCIMENTO AS nascimento
-        FROM ${tab}
-        WHERE SG_UF = 'GO'
-          AND NM_MUNICIPIO = '${municipio}'
-          AND NR_TURNO = 1
-        ORDER BY NM_URNA_CANDIDATO
-      `);
-      return rows;
+      let q = supabase
+        .from('bd_eleicoes_candidatos')
+        .select('*')
+        .eq('ano', ano)
+        .eq('municipio', municipio);
+
+      if (cargo) q = q.eq('cargo', cargo);
+      if (partido) q = q.eq('sigla_partido', partido);
+      if (zona) q = q.eq('zona', zona);
+
+      const { data, error } = await q.order('nome_urna');
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!municipio,
     staleTime: 5 * 60_000,
@@ -47,7 +40,7 @@ function useBuscaCandidatos() {
 }
 
 export default function PerfilCandidatos() {
-  const { data: candidatos, isLoading } = useBuscaCandidatos();
+  const { data: candidatos, isLoading } = useCandidatos();
   const { municipio, ano } = useFilterStore();
   const [busca, setBusca] = useState('');
 
@@ -56,15 +49,14 @@ export default function PerfilCandidatos() {
     if (!busca) return candidatos;
     const q = busca.toLowerCase();
     return candidatos.filter((c: any) =>
-      c.nome?.toLowerCase().includes(q) ||
+      c.nome_completo?.toLowerCase().includes(q) ||
       c.nome_urna?.toLowerCase().includes(q) ||
-      c.partido?.toLowerCase().includes(q) ||
+      c.sigla_partido?.toLowerCase().includes(q) ||
       c.cargo?.toLowerCase().includes(q) ||
-      c.numero?.toString().includes(q)
+      c.numero_urna?.toString().includes(q)
     );
   }, [candidatos, busca]);
 
-  // Agrupa por cargo
   const porCargo = useMemo(() => {
     const map = new Map<string, any[]>();
     for (const c of filtered) {
@@ -72,7 +64,16 @@ export default function PerfilCandidatos() {
       if (!map.has(cargo)) map.set(cargo, []);
       map.get(cargo)!.push(c);
     }
-    return Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    // Ordena: Prefeito primeiro, depois Vereador, depois o resto
+    const order = ['PREFEITO', 'VICE-PREFEITO', 'VEREADOR'];
+    return Array.from(map.entries()).sort((a, b) => {
+      const ia = order.indexOf(a[0].toUpperCase());
+      const ib = order.indexOf(b[0].toUpperCase());
+      if (ia >= 0 && ib >= 0) return ia - ib;
+      if (ia >= 0) return -1;
+      if (ib >= 0) return 1;
+      return a[0].localeCompare(b[0]);
+    });
   }, [filtered]);
 
   if (isLoading) {
@@ -89,7 +90,6 @@ export default function PerfilCandidatos() {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="text-lg font-bold text-foreground">Perfil de Candidatos</h1>
@@ -100,7 +100,6 @@ export default function PerfilCandidatos() {
         </Badge>
       </div>
 
-      {/* Busca */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
@@ -111,7 +110,6 @@ export default function PerfilCandidatos() {
         />
       </div>
 
-      {/* Lista por cargo */}
       {porCargo.length === 0 ? (
         <Card><CardContent className="p-8 text-center">
           <User className="w-10 h-10 mx-auto text-muted-foreground/40 mb-2" />
@@ -119,16 +117,16 @@ export default function PerfilCandidatos() {
         </CardContent></Card>
       ) : (
         <div className="space-y-5">
-          {porCargo.map(([cargo, candidatosCargo]) => (
+          {porCargo.map(([cargo, lista]) => (
             <div key={cargo}>
               <div className="flex items-center gap-2 mb-2">
                 <Landmark className="w-4 h-4 text-primary" />
                 <h2 className="text-sm font-bold text-foreground">{cargo}</h2>
-                <Badge variant="outline" className="text-[9px] h-4">{candidatosCargo.length}</Badge>
+                <Badge variant="outline" className="text-[9px] h-4">{lista.length}</Badge>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                {candidatosCargo.map((c: any) => (
-                  <CandidatoCard key={c.id} candidato={c} />
+                {lista.map((c: any) => (
+                  <CandidatoCard key={c.id} c={c} />
                 ))}
               </div>
             </div>
@@ -139,7 +137,7 @@ export default function PerfilCandidatos() {
   );
 }
 
-function getSituacaoColor(sit: string | null) {
+function getSitColor(sit: string | null) {
   if (!sit) return 'bg-muted text-muted-foreground';
   const s = sit.toUpperCase();
   if (s.includes('ELEIT') || s.includes('MÉDIA')) return 'bg-green-100 text-green-700 border-green-200';
@@ -149,50 +147,65 @@ function getSituacaoColor(sit: string | null) {
   return 'bg-muted text-muted-foreground';
 }
 
-function CandidatoCard({ candidato: c }: { candidato: any }) {
-  const idade = c.nascimento ? calcularIdade(c.nascimento) : null;
+function calcIdade(nasc: string | null): number | null {
+  if (!nasc) return null;
+  try {
+    const parts = nasc.split('/');
+    if (parts.length === 3) {
+      const dt = new Date(+parts[2], +parts[1] - 1, +parts[0]);
+      return Math.floor((Date.now() - dt.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    }
+    const dt = new Date(nasc);
+    if (!isNaN(dt.getTime())) return Math.floor((Date.now() - dt.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+    return null;
+  } catch { return null; }
+}
+
+function CandidatoCard({ c }: { c: any }) {
+  const idade = calcIdade(c.data_nascimento);
+  const seqId = c.sequencial_candidato || c.id;
 
   return (
-    <Link to={`/candidato/${c.id}`} className="block">
+    <Link to={`/candidato/${seqId}`} className="block">
       <Card className="border-border/50 hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer group">
         <CardContent className="p-3">
           <div className="flex items-start gap-3">
-            {/* Avatar */}
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
-              <User className="w-5 h-5 text-primary" />
-            </div>
+            {c.foto_url ? (
+              <img src={c.foto_url} alt={c.nome_urna} className="w-10 h-10 rounded-full object-cover shrink-0 border border-border/50" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 group-hover:bg-primary/20 transition-colors">
+                <User className="w-5 h-5 text-primary" />
+              </div>
+            )}
 
             <div className="flex-1 min-w-0">
-              {/* Nome e número */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
                 <p className="text-xs font-bold truncate group-hover:text-primary transition-colors">
-                  {c.nome_urna || c.nome}
+                  {c.nome_urna || c.nome_completo}
                 </p>
                 <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
               </div>
 
-              {c.nome_urna && c.nome !== c.nome_urna && (
-                <p className="text-[10px] text-muted-foreground truncate">{c.nome}</p>
+              {c.nome_urna && c.nome_completo && c.nome_completo !== c.nome_urna && (
+                <p className="text-[10px] text-muted-foreground truncate">{c.nome_completo}</p>
               )}
 
-              {/* Partido e número */}
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <Badge variant="outline" className="text-[9px] h-4 font-bold">{c.partido}</Badge>
-                <span className="text-[10px] text-muted-foreground font-mono">Nº {c.numero}</span>
-                {c.situacao && (
-                  <Badge className={cn("text-[8px] h-4 border", getSituacaoColor(c.situacao))}>
-                    {c.situacao}
+                <Badge variant="outline" className="text-[9px] h-4 font-bold">{c.sigla_partido}</Badge>
+                <span className="text-[10px] text-muted-foreground font-mono">Nº {c.numero_urna}</span>
+                {c.situacao_final && (
+                  <Badge className={cn("text-[8px] h-4 border", getSitColor(c.situacao_final))}>
+                    {c.situacao_final}
                   </Badge>
                 )}
               </div>
 
-              {/* Detalhes */}
               <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground flex-wrap">
                 {c.genero && <span>{c.genero}</span>}
                 {idade && <span>• {idade} anos</span>}
-                {c.instrucao && (
+                {c.grau_instrucao && (
                   <span className="flex items-center gap-0.5">
-                    <GraduationCap className="w-3 h-3" />{c.instrucao}
+                    <GraduationCap className="w-3 h-3" />{c.grau_instrucao}
                   </span>
                 )}
               </div>
@@ -205,16 +218,4 @@ function CandidatoCard({ candidato: c }: { candidato: any }) {
       </Card>
     </Link>
   );
-}
-
-function calcularIdade(nascimento: string): number | null {
-  try {
-    const parts = nascimento.split('/');
-    if (parts.length === 3) {
-      const dt = new Date(+parts[2], +parts[1] - 1, +parts[0]);
-      const diff = Date.now() - dt.getTime();
-      return Math.floor(diff / (365.25 * 24 * 60 * 60 * 1000));
-    }
-    return null;
-  } catch { return null; }
 }
