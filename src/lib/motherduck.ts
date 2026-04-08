@@ -525,7 +525,39 @@ export function sqlEleitoresPorBairro(ano: number, municipio: string): string {
   `.trim();
 }
 
-/** Evolução histórica do comparecimento em um município */
+/** Votos totais por zona+bairro+escola (geral, sem candidato específico) */
+export function sqlVotosRegional(filtros: FiltrosPainel = {}): string {
+  const ano = filtros.ano || 2024;
+  const vot = getTableName('votacao_secao', ano);
+  const loc = getTableName('eleitorado_local', ano);
+  const municipio = filtros.municipio || 'GOIÂNIA';
+
+  const conds: string[] = [`v.NM_MUNICIPIO = '${municipio}'`];
+  if (filtros.turno) conds.push(`v.NR_TURNO = ${filtros.turno}`);
+  if (filtros.zona) conds.push(`v.NR_ZONA = ${filtros.zona}`);
+  if (filtros.bairro) conds.push(`loc.NM_BAIRRO = '${filtros.bairro}'`);
+  if (filtros.escola) conds.push(`loc.NM_LOCAL_VOTACAO = '${filtros.escola}'`);
+
+  const where = `WHERE ${conds.join(' AND ')}`;
+
+  return `
+    SELECT
+      v.NR_ZONA AS zona,
+      COALESCE(loc.NM_BAIRRO, '') AS bairro,
+      COALESCE(loc.NM_LOCAL_VOTACAO, '') AS escola,
+      COUNT(DISTINCT v.NR_SECAO) AS secoes,
+      SUM(v.QT_VOTOS_NOMINAIS) AS total_votos
+    FROM ${vot} v
+    INNER JOIN ${loc} loc
+      ON v.NR_ZONA = loc.NR_ZONA AND v.NR_SECAO = loc.NR_SECAO
+      AND loc.SG_UF = 'GO' AND loc.NM_MUNICIPIO = '${municipio}'
+    ${where}
+    GROUP BY v.NR_ZONA, loc.NM_BAIRRO, loc.NM_LOCAL_VOTACAO
+    ORDER BY total_votos DESC
+    LIMIT 300
+  `.trim();
+}
+
 export function sqlEvolucaoComparecimento(municipio: string): string {
   const anos = getAnosDisponiveis('detalhe_munzona');
   const unions = anos.map(a => {
