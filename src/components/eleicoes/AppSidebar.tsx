@@ -16,9 +16,6 @@ const mainItems = [
   { title: 'Converse com a IA', url: '/chat', icon: MessageSquare },
 ];
 
-const systemItems = [
-  { title: 'Configurações', url: '/config', icon: Settings },
-];
 
 export function AppSidebar() {
   const location = useLocation();
