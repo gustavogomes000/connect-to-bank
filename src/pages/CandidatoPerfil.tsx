@@ -735,7 +735,7 @@ export default function CandidatoPerfil() {
     queryKey: ['md', 'cand-auto', sq, anoFromUrl],
     enabled: !!sq,
     staleTime: 5 * 60 * 1000,
-    queryFn: async () => {
+    queryFn: async (): Promise<AnyRow | null> => {
       // Se tem ano na URL, busca direto nesse ano
       if (anoFromUrl && canUseDataset('candidatos', anoFromUrl)) {
         const rows = await mdQuery(sqlPerfilCandidato(anoFromUrl, { sq: String(sq) }));
