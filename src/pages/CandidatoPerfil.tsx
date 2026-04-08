@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { formatBRL } from '@/lib/eleicoes';
+import { formatBRL, traduzirSituacao } from '@/lib/eleicoes';
 import { cn } from '@/lib/utils';
 
 type AnyRow = Record<string, any>;
@@ -400,7 +400,7 @@ function HistoricoEleitoral({ historico, currentAno }: { historico: AnyRow[]; cu
                       )}
                     </div>
                     {data.situacao && (
-                      <Badge className={cn("text-[9px] h-5 border", getSitColor(data.situacao))}>{data.situacao}</Badge>
+                      <Badge className={cn("text-[9px] h-5 border", getSitColor(data.situacao))}>{traduzirSituacao(data.situacao)}</Badge>
                     )}
                     {candidatou && (
                       isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
@@ -785,7 +785,7 @@ export default function CandidatoPerfil() {
                 {candidato.municipio && <span className="text-xs text-muted-foreground">• {candidato.municipio}</span>}
               </div>
               {candidato.situacao && (
-                <Badge className={cn("text-[10px] mt-1 border", getSitColor(candidato.situacao))}>{candidato.situacao}</Badge>
+                <Badge className={cn("text-[10px] mt-1 border", getSitColor(candidato.situacao))}>{traduzirSituacao(candidato.situacao)}</Badge>
               )}
             </div>
           </div>
