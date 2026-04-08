@@ -181,18 +181,17 @@ function FavoritosPanel({ onUsar, onFechar }: { onUsar: (p: string) => void; onF
 
 // ── MAIN ──
 const SUGESTOES_RAPIDAS = [
-  "Top 10 vereadores mais votados em Goiânia 2024",
-  "Resumo geral da eleição de 2024",
-  "Distribuição de gênero dos candidatos 2024",
   "Comparar PT e PL para vereador em Goiânia 2024",
   "Evolução do comparecimento em Goiânia",
+  "Top 10 vereadores mais votados em Goiânia 2024",
+  "Abstenção por zona eleitoral em Goiânia 2024",
+];
+
+const SUGESTOES_EXTRAS = [
+  "Distribuição de gênero dos candidatos 2024",
   "Candidatos com maior patrimônio em 2024",
-  "Escolaridade dos candidatos a prefeito 2024",
-  "Abstenção por município em 2024",
   "Ranking de partidos em Aparecida de Goiânia 2024",
   "Votos por zona eleitoral em Goiânia 2024",
-  "Ocupações mais comuns dos vereadores 2024",
-  "Bairros com maior comparecimento em Goiânia 2024",
 ];
 
 export default function ChatEleicoes() {
