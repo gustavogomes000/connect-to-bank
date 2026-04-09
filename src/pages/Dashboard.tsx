@@ -233,7 +233,7 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="py-1.5">
                           <Link
-                            to={`/candidato/${row.sq_candidato}`}
+                            to={`/candidatos/${row.sq_candidato}/${ano}`}
                             className="text-sm font-medium text-foreground hover:text-primary transition-colors truncate block max-w-[200px]"
                             title={row.candidato}
                           >
