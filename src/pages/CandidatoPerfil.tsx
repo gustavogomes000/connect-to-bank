@@ -819,9 +819,15 @@ export default function CandidatoPerfil() {
     queryKey: ['md', 'composicao', ano, nrCandidato, mun],
     enabled: !!nrCandidato && !!candidatoQ.data && canUseDataset('boletim_urna', ano),
     staleTime: 5 * 60 * 1000,
+    retry: false,
     queryFn: async () => {
-      const rows = await mdQuery(sqlComposicaoVotosCandidato(ano, nrCandidato!, mun));
-      return rows as AnyRow[];
+      try {
+        const rows = await mdQuery(sqlComposicaoVotosCandidato(ano, nrCandidato!, mun));
+        return (rows || []) as AnyRow[];
+      } catch (e) {
+        console.warn('Erro ao buscar composição de votos:', e);
+        return [] as AnyRow[];
+      }
     },
   });
 
