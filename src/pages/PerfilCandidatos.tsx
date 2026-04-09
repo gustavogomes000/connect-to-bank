@@ -81,8 +81,10 @@ function useCandidatos(municipio: string, cargo: string | null, partido: string 
 }
 
 export default function PerfilCandidatos() {
-  const { data: candidatos, isLoading, isError } = useCandidatos();
-  const { municipio } = useFilterStore();
+  const [municipio, setMunicipio] = useState('APARECIDA DE GOIÂNIA');
+  const [cargo, setCargo] = useState<string | null>(null);
+  const [partido, setPartido] = useState<string | null>(null);
+  const { data: candidatos, isLoading, isError } = useCandidatos(municipio, cargo, partido);
   const [busca, setBusca] = useState('');
 
   const filtered = useMemo(() => {
