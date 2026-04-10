@@ -27,6 +27,7 @@ interface CandidatoOption {
   cargo: string;
   numero: number;
   ano: number;
+  municipio: string;
 }
 
 interface ComparativoRow {
