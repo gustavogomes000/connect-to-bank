@@ -179,7 +179,7 @@ const CORES_COMPARATIVO = [
 export default function ZonasEleitorais() {
   const { municipio, ano } = useFilterStore();
   const [searchCandidato, setSearchCandidato] = useState('');
-  const [selecionados, setSelecionados] = useState<{ sq: string; ano: number; label: string; partido: string; cargo: string }[]>([]);
+  const [selecionados, setSelecionados] = useState<CandidatoSelecionado[]>([]);
 
   // Clear selections when year changes
   useEffect(() => {
@@ -190,7 +190,13 @@ export default function ZonasEleitorais() {
   const { data: resultadosBusca, isLoading: buscando } = useBuscarCandidatos(municipio, searchCandidato, ano);
 
   const comparativoItems = useMemo(() =>
-    selecionados.map(s => ({ sq: s.sq, ano: s.ano, label: s.label })),
+    selecionados.map(s => ({
+      sq: s.sq,
+      ano: s.ano,
+      label: s.label,
+      numero: s.numero,
+      cargo: s.cargo,
+    })),
     [selecionados]
   );
 
@@ -205,6 +211,7 @@ export default function ZonasEleitorais() {
       sq: c.sq_candidato,
       ano: c.ano,
       label: c.candidato,
+      numero: c.numero,
       partido: c.partido,
       cargo: c.cargo,
     }]);
