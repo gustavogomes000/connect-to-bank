@@ -43,10 +43,10 @@ function useBuscarCandidatos(municipio: string, search: string, anosAtivos: numb
     queryFn: async () => {
       if (!search || search.length < 3 || anosAtivos.length === 0) return [];
       const searchUpper = search.toUpperCase().replace(/'/g, "''");
-      const queries = anosAtivos.map(ano => {
+      const queries = anosAtivos.map((ano, idx) => {
         if (!getAnosDisponiveis('candidatos').includes(ano)) return null;
         const cand = getTableName('candidatos', ano);
-        return `(
+        return `
           SELECT DISTINCT
             CAST(c.SQ_CANDIDATO AS VARCHAR) AS sq_candidato,
             c.NM_URNA_CANDIDATO AS candidato,
@@ -56,12 +56,12 @@ function useBuscarCandidatos(municipio: string, search: string, anosAtivos: numb
             c.NR_CANDIDATO AS numero,
             ${ano} AS ano
           FROM ${cand} c
-          WHERE UPPER(c.NM_URNA_CANDIDATO) LIKE '%${searchUpper}%'
-          LIMIT 15
-        )`;
+          WHERE (UPPER(c.NM_URNA_CANDIDATO) LIKE '%${searchUpper}%'
+              OR UPPER(c.NM_CANDIDATO) LIKE '%${searchUpper}%')
+        `;
       }).filter(Boolean);
       if (queries.length === 0) return [];
-      const sql = queries.join('\nUNION ALL\n') + '\nORDER BY candidato, ano DESC\nLIMIT 50';
+      const sql = 'SELECT * FROM (\n' + queries.join('\nUNION ALL\n') + '\n) sub\nORDER BY candidato, ano DESC\nLIMIT 50';
       return await mdQuery<CandidatoOption>(sql);
     },
     enabled: !!municipio && search.length >= 3 && anosAtivos.length > 0,
