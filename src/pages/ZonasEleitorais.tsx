@@ -35,6 +35,18 @@ interface ComparativoRow {
   [key: string]: any; // votos_CANDIDATO_ANO
 }
 
+interface ComparativoCandidato {
+  sq: string;
+  ano: number;
+  label: string;
+  numero: number;
+  cargo: string;
+}
+
+interface CandidatoSelecionado extends ComparativoCandidato {
+  partido: string;
+}
+
 /** Hook: search candidates for a single year */
 function useBuscarCandidatos(municipio: string, search: string, ano: number) {
   return useQuery({
@@ -73,7 +85,7 @@ function useBuscarCandidatos(municipio: string, search: string, ano: number) {
 /** Hook: compare votes by zona for selected candidates */
 function useComparativoZona(
   municipio: string,
-  selecionados: { sq: string; ano: number; label: string }[]
+  selecionados: ComparativoCandidato[]
 ) {
   return useQuery({
     queryKey: ['comparativo-zona', municipio, selecionados.map(s => `${s.sq}_${s.ano}`)],
@@ -98,7 +110,6 @@ function useComparativoZona(
       const sql = subqueries.join('\nUNION ALL\n') + '\nORDER BY zona, idx';
       const rows = await mdQuery<{ zona: number; votos: number; candidato_label: string; idx: number }>(sql);
 
-      // Pivot: zona → { zona, votos_LABEL1, votos_LABEL2, ... }
       const map = new Map<number, any>();
       for (const r of rows) {
         if (!map.has(r.zona)) map.set(r.zona, { zona: r.zona });
@@ -115,55 +126,30 @@ function useComparativoZona(
 /** Hook: compare votes by escola for selected candidates */
 function useComparativoEscola(
   municipio: string,
-  selecionados: { sq: string; ano: number; label: string }[]
+  selecionados: ComparativoCandidato[]
 ) {
   return useQuery({
     queryKey: ['comparativo-escola', municipio, selecionados.map(s => `${s.sq}_${s.ano}`)],
     queryFn: async () => {
       if (selecionados.length === 0) return [];
       const municipioSafe = municipio.replace(/'/g, "''");
-      const subqueries = selecionados.map((s, i) => {
-        const votSecao = getTableName('votacao_secao', s.ano);
-        const anosLocal = getAnosDisponiveis('eleitorado_local');
-        const sorted = [...anosLocal].sort((a, b) => Math.abs(a - s.ano) - Math.abs(b - s.ano));
-        const anoLocal = sorted[0] || 2024;
-        const loc = getTableName('eleitorado_local', anoLocal);
-        const sqSafe = s.sq.replace(/'/g, "''");
-        return `
-          SELECT
-            COALESCE(loc.NM_LOCAL_VOTACAO, 'NÃO INFORMADO') AS escola,
-            COALESCE(loc.NM_BAIRRO, 'NÃO INFORMADO') AS bairro,
-            vs.NR_ZONA AS zona,
-            SUM(vs.QT_VOTOS) AS votos,
-            '${s.label.replace(/'/g, "''")}' AS candidato_label,
-            ${i} AS idx
-          FROM ${votSecao} vs
-          INNER JOIN (
-            SELECT NM_MUNICIPIO, NR_ZONA, NR_SECAO,
-              MAX(NM_BAIRRO) AS NM_BAIRRO,
-              MAX(NM_LOCAL_VOTACAO) AS NM_LOCAL_VOTACAO
-            FROM ${loc}
-            WHERE SG_UF = 'GO' AND NM_MUNICIPIO = '${municipioSafe}'
-            GROUP BY NM_MUNICIPIO, NR_ZONA, NR_SECAO
-          ) loc ON vs.NR_ZONA = loc.NR_ZONA AND vs.NR_SECAO = loc.NR_SECAO
-          WHERE vs.NR_VOTAVEL = (
-            SELECT NR_CANDIDATO
-            FROM ${getTableName('candidatos', s.ano)}
-            WHERE CAST(SQ_CANDIDATO AS VARCHAR) = '${sqSafe}'
-            ORDER BY COALESCE(NR_TURNO, 0) DESC
-            LIMIT 1
-          )
-            AND vs.NM_MUNICIPIO = '${municipioSafe}'
-          GROUP BY loc.NM_LOCAL_VOTACAO, loc.NM_BAIRRO, vs.NR_ZONA
-        `;
-      });
+      const subqueries = selecionados.map((s, i) => `
+        SELECT
+          base.escola,
+          base.bairro,
+          base.zona,
+          base.total_votos AS votos,
+          ${i} AS idx
+        FROM (${sqlComposicaoVotosCandidato(s.ano, s.numero, municipio, s.cargo)}) base
+        WHERE base.municipio = '${municipioSafe}'
+      `);
       const sql = subqueries.join('\nUNION ALL\n') + '\nORDER BY escola, idx';
       const rows = await mdQuery<{ escola: string; bairro: string; zona: number; votos: number; idx: number }>(sql);
 
       const map = new Map<string, any>();
       for (const r of rows) {
-        const key = `${r.escola}_${r.zona}`;
-        if (!map.has(key)) map.set(key, { escola: r.escola, bairro: r.bairro, zona: r.zona });
+        const key = `${r.escola}_${r.bairro}_${r.zona}`;
+        if (!map.has(key)) map.set(key, { escola: r.escola, bairro: r.bairro, zona: Number(r.zona) });
         const entry = map.get(key)!;
         entry[`votos_${r.idx}`] = Number(r.votos);
       }
