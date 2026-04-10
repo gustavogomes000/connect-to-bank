@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/eleicoes/AppSidebar";
-import { GlobalFilters } from "@/components/eleicoes/GlobalFilters";
+import { GlobalFilters, FilterField } from "@/components/eleicoes/GlobalFilters";
 import Ranking from "./pages/Ranking";
 import ZonasEleitorais from "./pages/ZonasEleitorais";
 import EscolasEleitorais from "./pages/EscolasEleitorais";
@@ -30,11 +30,19 @@ const queryClient = new QueryClient({
 
 const HIDE_FILTERS = ['/ajuda', '/config', '/chat', '/relatorios', '/candidatos', '/candidato', '/perfil-candidatos'];
 
+const ROUTE_FILTERS: Record<string, FilterField[]> = {
+  '/zonas': ['ano', 'municipio', 'cargo', 'turno'],
+};
+
 function Layout() {
   const location = useLocation();
   const hideFilters = HIDE_FILTERS.some(
     (path) => location.pathname === path || location.pathname.startsWith(`${path}/`)
   );
+  const routeFilters = Object.entries(ROUTE_FILTERS).find(
+    ([path]) => location.pathname === path || location.pathname.startsWith(`${path}/`)
+  );
+  const visibleFilters = routeFilters ? routeFilters[1] : undefined;
 
   return (
     <SidebarProvider>
@@ -48,7 +56,7 @@ function Layout() {
               <span className="text-[10px] text-muted-foreground">Inteligência Eleitoral</span>
             </div>
           </header>
-          {!hideFilters && <GlobalFilters />}
+          {!hideFilters && <GlobalFilters visibleFilters={visibleFilters} />}
           <main className="flex-1 p-3 md:p-4 overflow-auto">
             <Routes>
               <Route path="/" element={<Ranking />} />
