@@ -116,7 +116,7 @@ function useComparativoZona(
 /** Hook: compare votes by escola for selected candidates */
 function useComparativoEscola(
   municipio: string,
-  selecionados: { sq: string; ano: number; label: string }[]
+  selecionados: { sq: string; ano: number; label: string; mun?: string }[]
 ) {
   return useQuery({
     queryKey: ['comparativo-escola', municipio, selecionados.map(s => `${s.sq}_${s.ano}`)],
