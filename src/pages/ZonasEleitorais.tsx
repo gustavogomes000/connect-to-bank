@@ -46,7 +46,7 @@ function useBuscarCandidatos(municipio: string, search: string, anosAtivos: numb
       const queries = anosAtivos.map(ano => {
         if (!getAnosDisponiveis('candidatos').includes(ano)) return null;
         const cand = getTableName('candidatos', ano);
-        return `
+        return `(
           SELECT DISTINCT
             CAST(c.SQ_CANDIDATO AS VARCHAR) AS sq_candidato,
             c.NM_URNA_CANDIDATO AS candidato,
@@ -58,7 +58,7 @@ function useBuscarCandidatos(municipio: string, search: string, anosAtivos: numb
           FROM ${cand} c
           WHERE UPPER(c.NM_URNA_CANDIDATO) LIKE '%${searchUpper}%'
           LIMIT 15
-        `;
+        )`;
       }).filter(Boolean);
       if (queries.length === 0) return [];
       const sql = queries.join('\nUNION ALL\n') + '\nORDER BY candidato, ano DESC\nLIMIT 50';
