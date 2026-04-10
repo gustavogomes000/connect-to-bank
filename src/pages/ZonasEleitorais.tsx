@@ -191,12 +191,11 @@ const CORES_COMPARATIVO = [
 ];
 
 export default function ZonasEleitorais() {
-  const { municipio } = useFilterStore();
-  const [anosAtivos, setAnosAtivos] = useState<number[]>([2024]);
+  const { municipio, ano } = useFilterStore();
   const [searchCandidato, setSearchCandidato] = useState('');
   const [selecionados, setSelecionados] = useState<{ sq: string; ano: number; label: string; partido: string; cargo: string }[]>([]);
 
-  const { data: resultadosBusca, isLoading: buscando } = useBuscarCandidatos(municipio, searchCandidato, anosAtivos);
+  const { data: resultadosBusca, isLoading: buscando } = useBuscarCandidatos(municipio, searchCandidato, ano);
 
   const comparativoItems = useMemo(() =>
     selecionados.map(s => ({ sq: s.sq, ano: s.ano, label: s.label })),
@@ -206,10 +205,6 @@ export default function ZonasEleitorais() {
   const { data: dadosZona, isLoading: loadingZona, error: erroZona } = useComparativoZona(municipio, comparativoItems);
   const { data: dadosEscola, isLoading: loadingEscola, error: erroEscola } = useComparativoEscola(municipio, comparativoItems);
 
-  const toggleAno = useCallback((ano: number) => {
-    setAnosAtivos(prev => prev.includes(ano) ? prev.filter(a => a !== ano) : [...prev, ano]);
-  }, []);
-
   const adicionarCandidato = useCallback((c: CandidatoOption) => {
     const key = `${c.sq_candidato}_${c.ano}`;
     if (selecionados.some(s => `${s.sq}_${s.ano}` === key)) return;
@@ -217,7 +212,7 @@ export default function ZonasEleitorais() {
     setSelecionados(prev => [...prev, {
       sq: c.sq_candidato,
       ano: c.ano,
-      label: `${c.candidato} (${c.ano})`,
+      label: c.candidato,
       partido: c.partido,
       cargo: c.cargo,
     }]);
@@ -246,31 +241,9 @@ export default function ZonasEleitorais() {
           Comparativo Eleitoral por Zona e Escola
         </h1>
         <p className="text-xs text-muted-foreground">
-          {municipio} — Compare candidatos entre diferentes anos, zonas eleitorais e escolas
+          {municipio} — {ano} — Compare candidatos da mesma eleição por zonas e escolas
         </p>
       </div>
-
-      {/* Seleção de anos */}
-      <Card className="border-border/50">
-        <CardContent className="p-4">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            1. Selecione os anos para busca
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {TODOS_ANOS.map(ano => (
-              <Button
-                key={ano}
-                variant={anosAtivos.includes(ano) ? 'default' : 'outline'}
-                size="sm"
-                className="text-xs h-8"
-                onClick={() => toggleAno(ano)}
-              >
-                {ano}
-              </Button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Busca e seleção de candidatos */}
       <Card className="border-border/50">
