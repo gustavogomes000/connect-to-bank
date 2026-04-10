@@ -47,6 +47,8 @@ function useBuscarCandidatos(municipio: string, search: string, anosAtivos: numb
       const queries = anosAtivos.map((ano, idx) => {
         if (!getAnosDisponiveis('candidatos').includes(ano)) return null;
         const cand = getTableName('candidatos', ano);
+        const isGeral = [2014, 2018, 2022].includes(ano);
+        const munFilter = isGeral ? '' : `AND c.NM_UE = '${municipio}'`;
         return `
           SELECT DISTINCT
             CAST(c.SQ_CANDIDATO AS VARCHAR) AS sq_candidato,
@@ -55,10 +57,12 @@ function useBuscarCandidatos(municipio: string, search: string, anosAtivos: numb
             c.SG_PARTIDO AS partido,
             c.DS_CARGO AS cargo,
             c.NR_CANDIDATO AS numero,
-            ${ano} AS ano
+            ${ano} AS ano,
+            c.NM_UE AS municipio
           FROM ${cand} c
           WHERE (UPPER(c.NM_URNA_CANDIDATO) LIKE '%${searchUpper}%'
               OR UPPER(c.NM_CANDIDATO) LIKE '%${searchUpper}%')
+            ${munFilter}
         `;
       }).filter(Boolean);
       if (queries.length === 0) return [];
