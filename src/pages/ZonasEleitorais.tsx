@@ -17,8 +17,6 @@ import { useQuery } from '@tanstack/react-query';
 
 const fmt = (n: number | string) => Number(n || 0).toLocaleString('pt-BR');
 
-const TODOS_ANOS = [2024, 2022, 2020, 2018, 2016, 2014] as const;
-
 interface CandidatoOption {
   sq_candidato: string;
   candidato: string;
