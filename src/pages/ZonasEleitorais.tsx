@@ -207,8 +207,8 @@ export default function ZonasEleitorais() {
     [selecionados]
   );
 
-  const { data: dadosZona, isLoading: loadingZona } = useComparativoZona(municipio, comparativoItems);
-  const { data: dadosEscola, isLoading: loadingEscola } = useComparativoEscola(municipio, comparativoItems);
+  const { data: dadosZona, isLoading: loadingZona, error: erroZona } = useComparativoZona(municipio, comparativoItems);
+  const { data: dadosEscola, isLoading: loadingEscola, error: erroEscola } = useComparativoEscola(municipio, comparativoItems);
 
   const toggleAno = useCallback((ano: number) => {
     setAnosAtivos(prev => prev.includes(ano) ? prev.filter(a => a !== ano) : [...prev, ano]);
@@ -398,6 +398,12 @@ export default function ZonasEleitorais() {
                           ))}
                         </TableRow>
                       ))
+                    ) : erroZona ? (
+                      <TableRow>
+                        <TableCell colSpan={selecionados.length + 2} className="text-center text-destructive text-sm py-8">
+                          Erro ao carregar dados: {erroZona.message}
+                        </TableCell>
+                      </TableRow>
                     ) : !dadosZona?.length ? (
                       <TableRow>
                         <TableCell colSpan={selecionados.length + 2} className="text-center text-muted-foreground text-sm py-8">
@@ -503,6 +509,12 @@ export default function ZonasEleitorais() {
                           ))}
                         </TableRow>
                       ))
+                    ) : erroEscola ? (
+                      <TableRow>
+                        <TableCell colSpan={selecionados.length + 3} className="text-center text-destructive text-sm py-8">
+                          Erro ao carregar dados: {erroEscola.message}
+                        </TableCell>
+                      </TableRow>
                     ) : !dadosEscola?.length ? (
                       <TableRow>
                         <TableCell colSpan={selecionados.length + 3} className="text-center text-muted-foreground text-sm py-8">
