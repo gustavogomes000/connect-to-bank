@@ -12,7 +12,7 @@ import {
   Hash, Search, School, X, GitCompareArrows, Plus,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mdQuery, getTableName, getAnosDisponiveis } from '@/lib/motherduck';
+import { mdQuery, getTableName, getAnosDisponiveis, sqlComposicaoVotosCandidato } from '@/lib/motherduck';
 import { useQuery } from '@tanstack/react-query';
 
 const fmt = (n: number | string) => Number(n || 0).toLocaleString('pt-BR');
