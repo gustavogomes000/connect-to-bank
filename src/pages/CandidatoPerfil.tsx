@@ -413,7 +413,7 @@ function HistoricoEleitoral({ historico, currentAno }: { historico: AnyRow[]; cu
           </Badge>
         )}
         <Badge variant="outline" className="text-[10px]">
-          {historico.length} {historico.length === 1 ? 'eleição' : 'eleições'} disputadas
+          {timeline.filter(t => t.candidatou).length} {timeline.filter(t => t.candidatou).length === 1 ? 'eleição disputada' : 'eleições disputadas'}
         </Badge>
       </div>
 
