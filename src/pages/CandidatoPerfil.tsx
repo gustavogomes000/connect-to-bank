@@ -113,7 +113,8 @@ function VoteCompositionSection({
   const porBairro = useMemo(() => {
     const map = new Map<string, number>();
     for (const r of filtered) {
-      const b = String(r.bairro || 'NÃO INFORMADO');
+      const b = String(r.bairro || '').trim();
+      if (!b || b === 'NÃO INFORMADO') continue;
       map.set(b, (map.get(b) || 0) + Number(r.total_votos || 0));
     }
     return [...map.entries()]
