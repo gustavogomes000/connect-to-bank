@@ -190,12 +190,12 @@ export default function ZonasEleitorais() {
   const { municipio } = useFilterStore();
   const [anosAtivos, setAnosAtivos] = useState<number[]>([2024]);
   const [searchCandidato, setSearchCandidato] = useState('');
-  const [selecionados, setSelecionados] = useState<{ sq: string; ano: number; label: string; partido: string; cargo: string }[]>([]);
+  const [selecionados, setSelecionados] = useState<{ sq: string; ano: number; label: string; partido: string; cargo: string; mun: string }[]>([]);
 
   const { data: resultadosBusca, isLoading: buscando } = useBuscarCandidatos(municipio, searchCandidato, anosAtivos);
 
   const comparativoItems = useMemo(() =>
-    selecionados.map(s => ({ sq: s.sq, ano: s.ano, label: s.label })),
+    selecionados.map(s => ({ sq: s.sq, ano: s.ano, label: s.label, mun: s.mun })),
     [selecionados]
   );
 
