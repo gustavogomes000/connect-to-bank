@@ -128,6 +128,7 @@ function useComparativoEscola(
         const sorted = [...anosLocal].sort((a, b) => Math.abs(a - s.ano) - Math.abs(b - s.ano));
         const anoLocal = sorted[0] || 2024;
         const loc = getTableName('eleitorado_local', anoLocal);
+        const mun = s.mun || municipio;
         return `
           SELECT
             COALESCE(loc.NM_LOCAL_VOTACAO, 'NÃO INFORMADO') AS escola,
@@ -142,14 +143,14 @@ function useComparativoEscola(
               MAX(NM_BAIRRO) AS NM_BAIRRO,
               MAX(NM_LOCAL_VOTACAO) AS NM_LOCAL_VOTACAO
             FROM ${loc}
-            WHERE SG_UF = 'GO' AND NM_MUNICIPIO = '${municipio}'
+            WHERE SG_UF = 'GO' AND NM_MUNICIPIO = '${mun}'
             GROUP BY NM_MUNICIPIO, NR_ZONA, NR_SECAO
           ) loc ON vs.NR_ZONA = loc.NR_ZONA AND vs.NR_SECAO = loc.NR_SECAO
           WHERE vs.NR_VOTAVEL = (
             SELECT NR_CANDIDATO FROM ${getTableName('candidatos', s.ano)}
             WHERE CAST(SQ_CANDIDATO AS VARCHAR) = '${s.sq}' LIMIT 1
           )
-            AND vs.NM_MUNICIPIO = '${municipio}'
+            AND vs.NM_MUNICIPIO = '${mun}'
           GROUP BY loc.NM_LOCAL_VOTACAO, loc.NM_BAIRRO, vs.NR_ZONA
         `;
       });
