@@ -35,39 +35,37 @@ interface ComparativoRow {
   [key: string]: any; // votos_CANDIDATO_ANO
 }
 
-/** Hook: search candidates across selected years */
-function useBuscarCandidatos(municipio: string, search: string, anosAtivos: number[]) {
+/** Hook: search candidates for a single year */
+function useBuscarCandidatos(municipio: string, search: string, ano: number) {
   return useQuery({
-    queryKey: ['busca-candidatos-comparativo', municipio, search, anosAtivos],
+    queryKey: ['busca-candidatos-comparativo', municipio, search, ano],
     queryFn: async () => {
-      if (!search || search.length < 3 || anosAtivos.length === 0) return [];
+      if (!search || search.length < 3) return [];
+      if (!getAnosDisponiveis('candidatos').includes(ano)) return [];
       const searchUpper = search.toUpperCase().replace(/'/g, "''");
-      const queries = anosAtivos.map((ano, idx) => {
-        if (!getAnosDisponiveis('candidatos').includes(ano)) return null;
-        const cand = getTableName('candidatos', ano);
-        const isGeral = [2014, 2018, 2022].includes(ano);
-        const munFilter = isGeral ? '' : `AND c.NM_UE = '${municipio}'`;
-        return `
-          SELECT DISTINCT
-            CAST(c.SQ_CANDIDATO AS VARCHAR) AS sq_candidato,
-            c.NM_URNA_CANDIDATO AS candidato,
-            c.NM_CANDIDATO AS nome_completo,
-            c.SG_PARTIDO AS partido,
-            c.DS_CARGO AS cargo,
-            c.NR_CANDIDATO AS numero,
-            ${ano} AS ano,
-            c.NM_UE AS municipio
-          FROM ${cand} c
-          WHERE (UPPER(c.NM_URNA_CANDIDATO) LIKE '%${searchUpper}%'
-              OR UPPER(c.NM_CANDIDATO) LIKE '%${searchUpper}%')
-            ${munFilter}
-        `;
-      }).filter(Boolean);
-      if (queries.length === 0) return [];
-      const sql = 'SELECT * FROM (\n' + queries.join('\nUNION ALL\n') + '\n) sub\nORDER BY candidato, ano DESC\nLIMIT 50';
+      const cand = getTableName('candidatos', ano);
+      const isGeral = [2014, 2018, 2022].includes(ano);
+      const munFilter = isGeral ? '' : `AND c.NM_UE = '${municipio}'`;
+      const sql = `
+        SELECT DISTINCT
+          CAST(c.SQ_CANDIDATO AS VARCHAR) AS sq_candidato,
+          c.NM_URNA_CANDIDATO AS candidato,
+          c.NM_CANDIDATO AS nome_completo,
+          c.SG_PARTIDO AS partido,
+          c.DS_CARGO AS cargo,
+          c.NR_CANDIDATO AS numero,
+          ${ano} AS ano,
+          c.NM_UE AS municipio
+        FROM ${cand} c
+        WHERE (UPPER(c.NM_URNA_CANDIDATO) LIKE '%${searchUpper}%'
+            OR UPPER(c.NM_CANDIDATO) LIKE '%${searchUpper}%')
+          ${munFilter}
+        ORDER BY c.NM_URNA_CANDIDATO
+        LIMIT 50
+      `;
       return await mdQuery<CandidatoOption>(sql);
     },
-    enabled: !!municipio && search.length >= 3 && anosAtivos.length > 0,
+    enabled: !!municipio && search.length >= 3,
     staleTime: 60_000,
   });
 }
