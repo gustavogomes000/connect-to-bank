@@ -249,7 +249,7 @@ export default function ZonasEleitorais() {
       <Card className="border-border/50">
         <CardContent className="p-4">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-            2. Busque e adicione candidatos para comparar (máx. 8)
+            Busque e adicione candidatos para comparar (máx. 8)
           </p>
 
           <div className="relative max-w-md">
